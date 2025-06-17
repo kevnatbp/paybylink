@@ -1,16 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, Settings, Download, Plus, MessageSquare, Send, User } from 'lucide-react';
+import { useSupabaseComments } from '../../hooks/useComments';
+
 
 const PaymentLinksPrototype = () => {
   const [activeTab, setActiveTab] = useState('preview');
   const [newComment, setNewComment] = useState('');
-  const [comments, setComments] = useState(() => {
-    // Initialize comments from localStorage
-    const savedComments = localStorage.getItem('paymentLinksComments');
-    return savedComments ? JSON.parse(savedComments) : [];
-  });
   const [userName, setUserName] = useState(() => {
-    // Initialize userName from localStorage
     return localStorage.getItem('paymentLinksUserName') || '';
   });
   const [isEditingName, setIsEditingName] = useState(false);
@@ -70,10 +66,17 @@ const PaymentLinksPrototype = () => {
     merchantPhone: '(555) 123-4567'
   };
 
-  // Save comments to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem('paymentLinksComments', JSON.stringify(comments));
-  }, [comments]);
+  // Use the Supabase comments hook
+  const { 
+    comments, 
+    loading: commentsLoading, 
+    error: commentsError, 
+    addComment, 
+    deleteComment 
+  } = useSupabaseComments('payment-links');
+
+  const [commentText, setCommentText] = useState('');
+  const [commentError, setCommentError] = useState(null);
 
   // Save userName to localStorage whenever it changes
   useEffect(() => {
@@ -185,24 +188,37 @@ const PaymentLinksPrototype = () => {
     }));
   };
 
-  const handleAddComment = () => {
-    if (newComment.trim() && userName.trim()) {
-      const comment = {
-        id: Date.now(),
-        text: newComment.trim(),
+  const handleAddComment = async (e) => {
+    e.preventDefault();
+    setCommentError(null);
+
+    if (!commentText.trim()) {
+      setCommentError('Please enter a comment');
+      return;
+    }
+
+    if (!userName.trim()) {
+      setCommentError('Please enter your name');
+      return;
+    }
+
+    try {
+      await addComment({
+        text: commentText,
         author: userName,
-        timestamp: new Date().toLocaleString(),
         tab: activeTab
-      };
-      setComments(prev => [...prev, comment]);
-      setNewComment('');
+      });
+      setCommentText('');
+    } catch (err) {
+      console.error('Error adding comment:', err);
+      setCommentError(err.message || 'Failed to add comment');
     }
   };
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleAddComment();
+      handleAddComment(e);
     }
   };
 
@@ -225,6 +241,9 @@ const PaymentLinksPrototype = () => {
     const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     return colors[hash % colors.length];
   };
+
+  // Filter comments for current tab
+  const currentTabComments = comments.filter(comment => comment.tab === activeTab);
 
   const ToggleSwitch = ({ enabled, onChange, disabled = false }) => (
     <button
@@ -280,6 +299,33 @@ const PaymentLinksPrototype = () => {
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar */}
         <div className="w-72 bg-white border-r border-gray-200 flex-shrink-0 flex flex-col">
+          {/* Navigation */}
+          <div className="p-3 border-b border-gray-200">
+            <nav className="space-y-1">
+              <SidebarNavItem
+                id="preview"
+                icon={Eye}
+                label="Preview"
+                isActive={activeTab === 'preview'}
+                onClick={setActiveTab}
+              />
+              <SidebarNavItem
+                id="adhoc"
+                icon={Plus}
+                label="Create Link"
+                isActive={activeTab === 'adhoc'}
+                onClick={setActiveTab}
+              />
+              <SidebarNavItem
+                id="settings"
+                icon={Settings}
+                label="Settings"
+                isActive={activeTab === 'settings'}
+                onClick={setActiveTab}
+              />
+            </nav>
+          </div>
+
           {/* User Profile Section */}
           <div className="p-3 border-b border-gray-200 bg-gray-50">
             {!userName && !isEditingName ? (
@@ -337,33 +383,6 @@ const PaymentLinksPrototype = () => {
             )}
           </div>
 
-          {/* Navigation */}
-          <div className="p-3 border-b border-gray-200">
-            <nav className="space-y-1">
-              <SidebarNavItem
-                id="preview"
-                icon={Eye}
-                label="Preview"
-                isActive={activeTab === 'preview'}
-                onClick={setActiveTab}
-              />
-              <SidebarNavItem
-                id="adhoc"
-                icon={Plus}
-                label="Create Link"
-                isActive={activeTab === 'adhoc'}
-                onClick={setActiveTab}
-              />
-              <SidebarNavItem
-                id="settings"
-                icon={Settings}
-                label="Settings"
-                isActive={activeTab === 'settings'}
-                onClick={setActiveTab}
-              />
-            </nav>
-          </div>
-
           {/* Comments Section */}
           <div className="border-b border-gray-200">
             {/* Comments Header */}
@@ -374,7 +393,7 @@ const PaymentLinksPrototype = () => {
                   <span className="uppercase tracking-wide">Comments</span>
                 </div>
                 <span className="bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded-full text-xs">
-                  {comments.filter(c => c.tab === activeTab).length}
+                  {currentTabComments.length}
                 </span>
               </div>
               <div className="text-xs text-gray-500 mt-0.5">
@@ -385,24 +404,36 @@ const PaymentLinksPrototype = () => {
             {/* Add Comment Form */}
             {userName && (
               <div className="px-3 py-2 bg-white border-t border-gray-100">
-                <textarea
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder={`Add a comment as ${userName}...`}
-                  rows={2}
-                  className="block w-full px-2 py-1 text-xs border border-gray-300 rounded shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                />
-                <div className="flex justify-between items-center mt-1.5">
-                  <span className="text-xs text-gray-500">Enter to send</span>
-                  <button
-                    onClick={handleAddComment}
-                    disabled={!newComment.trim()}
-                    className="flex items-center px-2 py-0.5 text-xs font-medium text-white bg-blue-600 border border-transparent rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Send className="h-3 w-3 mr-1" />
-                    Send
-                  </button>
+                <div className="space-y-4">
+                  {commentsError && (
+                    <div className="text-red-500 text-sm">
+                      Error loading comments: {commentsError}
+                    </div>
+                  )}
+                  
+                  {commentError && (
+                    <div className="text-red-500 text-sm">
+                      {commentError}
+                    </div>
+                  )}
+
+                  <form onSubmit={handleAddComment} className="space-y-3">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={commentText}
+                        onChange={(e) => setCommentText(e.target.value)}
+                        placeholder="Add a comment..."
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                      />
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </form>
                 </div>
               </div>
             )}
@@ -411,38 +442,39 @@ const PaymentLinksPrototype = () => {
           {/* Comments List */}
           <div className="flex-1 overflow-y-auto px-3 py-2">
             <div className="space-y-2">
-              {!userName ? (
+              {commentsLoading ? (
+                <div className="text-center py-4 text-gray-400">
+                  <p className="text-xs">Loading comments...</p>
+                </div>
+              ) : commentsError ? (
+                <div className="text-center py-4 text-red-400">
+                  <p className="text-xs">Error loading comments</p>
+                </div>
+              ) : !userName ? (
                 <div className="text-center py-4 text-gray-400">
                   <p className="text-xs">Set your name above to start commenting</p>
                 </div>
-              ) : comments.filter(comment => comment.tab === activeTab).length === 0 ? (
+              ) : currentTabComments.length === 0 ? (
                 <div className="text-center py-4 text-gray-400">
                   <p className="text-xs">No comments yet</p>
                   <p className="text-xs mt-1">Be the first to comment!</p>
                 </div>
               ) : (
-                comments
-                  .filter(comment => comment.tab === activeTab)
-                  .sort((a, b) => b.id - a.id)
-                  .map((comment) => (
-                    <div key={comment.id} className="text-xs">
-                      <div className="flex items-start space-x-2 p-2 bg-gray-50 rounded border border-gray-200 hover:border-gray-300 transition-colors">
-                        <div className="flex-shrink-0">
-                          <div className={`h-5 w-5 rounded-full flex items-center justify-center text-white text-xs font-medium ${getAvatarColor(comment.author)}`}>
-                            {getUserInitials(comment.author)}
-                          </div>
+                <div className="space-y-3">
+                  {currentTabComments.map((comment) => (
+                    <div key={comment.id} className="bg-gray-50 p-3 rounded-md">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="font-medium text-sm">{comment.author}</span>
+                          <p className="text-sm text-gray-600 mt-1">{comment.text}</p>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center space-x-1 mb-0.5">
-                            <span className="font-medium text-gray-900">{comment.author}</span>
-                            <span className="text-gray-400">•</span>
-                            <span className="text-gray-500 text-xs">{comment.timestamp}</span>
-                          </div>
-                          <p className="text-gray-700 leading-relaxed break-words">{comment.text}</p>
-                        </div>
+                        <span className="text-xs text-gray-500">
+                          {new Date(comment.created_at).toLocaleString()}
+                        </span>
                       </div>
                     </div>
-                  ))
+                  ))}
+                </div>
               )}
             </div>
           </div>
