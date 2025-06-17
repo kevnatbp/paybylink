@@ -480,13 +480,20 @@ const PaymentLinksPrototype = () => {
                   {currentTabComments.map((comment) => (
                     <div key={comment.id} className="bg-gray-50 p-3 rounded-md">
                       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
-                        <div>
-                          <span className="font-medium text-sm">{comment.author}</span>
-                          <p className="text-sm text-gray-600 mt-1 break-words">{comment.text}</p>
+                        <div className="flex-1 min-w-0 w-full">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-medium text-sm">{comment.author}</span>
+                            <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0 ml-2">
+                              {new Date(comment.created_at).toLocaleString(undefined, {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-600 break-words w-full">{comment.text}</p>
                         </div>
-                        <span className="text-xs text-gray-500 whitespace-nowrap">
-                          {new Date(comment.created_at).toLocaleString()}
-                        </span>
                       </div>
                     </div>
                   ))}
