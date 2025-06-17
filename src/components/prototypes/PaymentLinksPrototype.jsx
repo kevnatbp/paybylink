@@ -482,7 +482,12 @@ const PaymentLinksPrototype = () => {
                       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
                         <div className="flex-1 min-w-0 w-full">
                           <div className="flex items-center justify-between mb-1">
-                            <span className="font-medium text-sm">{comment.author}</span>
+                            <div className="flex items-center min-w-0">
+                              <div className={`h-6 w-6 rounded-full flex items-center justify-center mr-2 text-white text-xs font-medium flex-shrink-0 ${getAvatarColor(comment.author)}`}>
+                                {getUserInitials(comment.author)}
+                              </div>
+                              <span className="font-medium text-sm truncate">{comment.author}</span>
+                            </div>
                             <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0 ml-2">
                               {new Date(comment.created_at).toLocaleString(undefined, {
                                 month: 'short',
@@ -492,7 +497,9 @@ const PaymentLinksPrototype = () => {
                               })}
                             </span>
                           </div>
-                          <p className="text-sm text-gray-600 break-words w-full">{comment.text}</p>
+                          <div className="pl-8 pr-2">
+                            <p className="text-sm text-gray-600 break-words">{comment.text}</p>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -746,186 +753,188 @@ const PaymentLinksPrototype = () => {
 
               {activeTab === 'adhoc' && (
                 // Ad-hoc Link Creation Mode
-                <div className="max-w-4xl mx-auto">
-                  <div className="bg-white rounded-lg border border-gray-200 p-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h2 className="text-lg font-semibold text-gray-900">Create Ad-Hoc Payment Link</h2>
-                        <p className="text-sm text-gray-600 mt-0.5">Generate a custom payment link</p>
-                      </div>
-                    </div>
-
-                    {/* Attribution Type Selection */}
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Attribution Type</label>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        {getEnabledAttributionTypes().includes('invoice') && (
-                          <label className={`cursor-pointer rounded-lg border-2 p-3 ${
-                            adHocForm.attributionType === 'invoice' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
-                          }`}>
-                            <input
-                              type="radio"
-                              name="attributionType"
-                              value="invoice"
-                              checked={adHocForm.attributionType === 'invoice'}
-                              onChange={(e) => handleAdHocFormChange('attributionType', e.target.value)}
-                              className="sr-only"
-                            />
-                            <div className="text-center">
-                              <svg className="mx-auto h-6 w-6 text-gray-400 mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                              </svg>
-                              <h3 className="text-sm font-medium text-gray-900">Invoice</h3>
-                              <p className="text-xs text-gray-500 mt-0.5">Link to specific invoice</p>
-                            </div>
-                          </label>
-                        )}
-
-                        {getEnabledAttributionTypes().includes('openAmount') && (
-                          <label className={`cursor-pointer rounded-lg border-2 p-3 ${
-                            adHocForm.attributionType === 'openAmount' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
-                          }`}>
-                            <input
-                              type="radio"
-                              name="attributionType"
-                              value="openAmount"
-                              checked={adHocForm.attributionType === 'openAmount'}
-                              onChange={(e) => handleAdHocFormChange('attributionType', e.target.value)}
-                              className="sr-only"
-                            />
-                            <div className="text-center">
-                              <svg className="mx-auto h-6 w-6 text-gray-400 mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                              </svg>
-                              <h3 className="text-sm font-medium text-gray-900">Open Amount</h3>
-                              <p className="text-xs text-gray-500 mt-0.5">Custom payment amount</p>
-                            </div>
-                          </label>
-                        )}
-
-                        {getEnabledAttributionTypes().includes('accountBalance') && (
-                          <label className={`cursor-pointer rounded-lg border-2 p-3 ${
-                            adHocForm.attributionType === 'accountBalance' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
-                          }`}>
-                            <input
-                              type="radio"
-                              name="attributionType"
-                              value="accountBalance"
-                              checked={adHocForm.attributionType === 'accountBalance'}
-                              onChange={(e) => handleAdHocFormChange('attributionType', e.target.value)}
-                              className="sr-only"
-                            />
-                            <div className="text-center">
-                              <svg className="mx-auto h-6 w-6 text-gray-400 mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                              </svg>
-                              <h3 className="text-sm font-medium text-gray-900">Account Balance</h3>
-                              <p className="text-xs text-gray-500 mt-0.5">Total account balance</p>
-                            </div>
-                          </label>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Dynamic Form Fields */}
-                    <div className="space-y-4">
-                      {adHocForm.attributionType === 'invoice' && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="bg-white rounded-lg shadow-lg max-w-6xl mx-auto">
+                    <div className="p-4">
+                      <div className="flex items-center justify-between mb-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1.5">Select Invoice</label>
-                          <select
-                            value={adHocForm.selectedInvoice}
-                            onChange={(e) => handleAdHocFormChange('selectedInvoice', e.target.value)}
-                            className="block w-full px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
-                          >
-                            <option value="">Choose an invoice...</option>
-                            {availableInvoices.map(inv => (
-                              <option key={inv.id} value={inv.id}>
-                                {inv.id} - {inv.customer} - ${inv.amount} ({inv.date})
-                              </option>
-                            ))}
-                          </select>
+                          <h2 className="text-lg font-semibold text-gray-900">Create Ad-Hoc Payment Link</h2>
+                          <p className="text-sm text-gray-600 mt-0.5">Generate a custom payment link</p>
                         </div>
-                      )}
+                      </div>
 
-                      {adHocForm.attributionType === 'openAmount' && (
+                      {/* Attribution Type Selection */}
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Attribution Type</label>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          {getEnabledAttributionTypes().includes('invoice') && (
+                            <label className={`cursor-pointer rounded-lg border-2 p-3 ${
+                              adHocForm.attributionType === 'invoice' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                            }`}>
+                              <input
+                                type="radio"
+                                name="attributionType"
+                                value="invoice"
+                                checked={adHocForm.attributionType === 'invoice'}
+                                onChange={(e) => handleAdHocFormChange('attributionType', e.target.value)}
+                                className="sr-only"
+                              />
+                              <div className="text-center">
+                                <svg className="mx-auto h-6 w-6 text-gray-400 mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <h3 className="text-sm font-medium text-gray-900">Invoice</h3>
+                                <p className="text-xs text-gray-500 mt-0.5">Link to specific invoice</p>
+                              </div>
+                            </label>
+                          )}
+
+                          {getEnabledAttributionTypes().includes('openAmount') && (
+                            <label className={`cursor-pointer rounded-lg border-2 p-3 ${
+                              adHocForm.attributionType === 'openAmount' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                            }`}>
+                              <input
+                                type="radio"
+                                name="attributionType"
+                                value="openAmount"
+                                checked={adHocForm.attributionType === 'openAmount'}
+                                onChange={(e) => handleAdHocFormChange('attributionType', e.target.value)}
+                                className="sr-only"
+                              />
+                              <div className="text-center">
+                                <svg className="mx-auto h-6 w-6 text-gray-400 mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                                </svg>
+                                <h3 className="text-sm font-medium text-gray-900">Open Amount</h3>
+                                <p className="text-xs text-gray-500 mt-0.5">Custom payment amount</p>
+                              </div>
+                            </label>
+                          )}
+
+                          {getEnabledAttributionTypes().includes('accountBalance') && (
+                            <label className={`cursor-pointer rounded-lg border-2 p-3 ${
+                              adHocForm.attributionType === 'accountBalance' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                            }`}>
+                              <input
+                                type="radio"
+                                name="attributionType"
+                                value="accountBalance"
+                                checked={adHocForm.attributionType === 'accountBalance'}
+                                onChange={(e) => handleAdHocFormChange('attributionType', e.target.value)}
+                                className="sr-only"
+                              />
+                              <div className="text-center">
+                                <svg className="mx-auto h-6 w-6 text-gray-400 mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                                <h3 className="text-sm font-medium text-gray-900">Account Balance</h3>
+                                <p className="text-xs text-gray-500 mt-0.5">Total account balance</p>
+                              </div>
+                            </label>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Dynamic Form Fields */}
+                      <div className="space-y-4">
+                        {adHocForm.attributionType === 'invoice' && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Select Invoice</label>
+                            <select
+                              value={adHocForm.selectedInvoice}
+                              onChange={(e) => handleAdHocFormChange('selectedInvoice', e.target.value)}
+                              className="block w-full px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
+                            >
+                              <option value="">Choose an invoice...</option>
+                              {availableInvoices.map(inv => (
+                                <option key={inv.id} value={inv.id}>
+                                  {inv.id} - {inv.customer} - ${inv.amount} ({inv.date})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        {adHocForm.attributionType === 'openAmount' && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Payment Amount</label>
+                            <div className="flex items-center">
+                              <span className="text-sm text-gray-500 mr-2">USD</span>
+                              <input
+                                type="number"
+                                value={adHocForm.customAmount}
+                                onChange={(e) => handleAdHocFormChange('customAmount', e.target.value)}
+                                placeholder="0.00"
+                                min="0"
+                                step="0.01"
+                                className="block w-32 px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {adHocForm.attributionType === 'accountBalance' && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Select Account</label>
+                            <select
+                              value={adHocForm.accountId}
+                              onChange={(e) => handleAdHocFormChange('accountId', e.target.value)}
+                              className="block w-full px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
+                            >
+                              <option value="">Choose an account...</option>
+                              {availableAccounts.map(acc => (
+                                <option key={acc.id} value={acc.id}>
+                                  {acc.name} - Current Balance: ${acc.balance}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        {/* Common Fields */}
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1.5">Payment Amount</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1.5">Description (Optional)</label>
+                          <textarea
+                            value={adHocForm.description}
+                            onChange={(e) => handleAdHocFormChange('description', e.target.value)}
+                            placeholder="Add a description for this payment link..."
+                            rows={2}
+                            className="block w-full px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1.5">Link Expiration</label>
                           <div className="flex items-center">
-                            <span className="text-sm text-gray-500 mr-2">USD</span>
                             <input
                               type="number"
-                              value={adHocForm.customAmount}
-                              onChange={(e) => handleAdHocFormChange('customAmount', e.target.value)}
-                              placeholder="0.00"
-                              min="0"
-                              step="0.01"
-                              className="block w-32 px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
+                              value={adHocForm.expirationDays}
+                              onChange={(e) => handleAdHocFormChange('expirationDays', parseInt(e.target.value))}
+                              min="1"
+                              max="365"
+                              className="block w-16 px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                             />
+                            <span className="ml-2 text-sm text-gray-500">days</span>
                           </div>
+                          <p className="text-xs text-gray-500 mt-0.5">Payment link will expire after this many days</p>
                         </div>
-                      )}
-
-                      {adHocForm.attributionType === 'accountBalance' && (
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1.5">Select Account</label>
-                          <select
-                            value={adHocForm.accountId}
-                            onChange={(e) => handleAdHocFormChange('accountId', e.target.value)}
-                            className="block w-full px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
-                          >
-                            <option value="">Choose an account...</option>
-                            {availableAccounts.map(acc => (
-                              <option key={acc.id} value={acc.id}>
-                                {acc.name} - Current Balance: ${acc.balance}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-
-                      {/* Common Fields */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Description (Optional)</label>
-                        <textarea
-                          value={adHocForm.description}
-                          onChange={(e) => handleAdHocFormChange('description', e.target.value)}
-                          placeholder="Add a description for this payment link..."
-                          rows={2}
-                          className="block w-full px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
-                        />
                       </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Link Expiration</label>
-                        <div className="flex items-center">
-                          <input
-                            type="number"
-                            value={adHocForm.expirationDays}
-                            onChange={(e) => handleAdHocFormChange('expirationDays', parseInt(e.target.value))}
-                            min="1"
-                            max="365"
-                            className="block w-16 px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
-                          />
-                          <span className="ml-2 text-sm text-gray-500">days</span>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-0.5">Payment link will expire after this many days</p>
+                      {/* Action Buttons */}
+                      <div className="flex justify-end space-x-2 mt-6 pt-4 border-t border-gray-200">
+                        <button
+                          onClick={() => setActiveTab('preview')}
+                          className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleCreateAdHocLink}
+                          className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
+                        >
+                          Create Payment Link
+                        </button>
                       </div>
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex justify-end space-x-2 mt-6 pt-4 border-t border-gray-200">
-                      <button
-                        onClick={() => setActiveTab('preview')}
-                        className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleCreateAdHocLink}
-                        className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
-                      >
-                        Create Payment Link
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -933,231 +942,236 @@ const PaymentLinksPrototype = () => {
 
               {activeTab === 'settings' && (
                 // Settings Mode
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-7xl mx-auto">
-                  
-                  {/* Auto-Generate Payment Links */}
-                  <div className="bg-white rounded-lg border border-gray-200">
-                    <div className="px-3 py-3 border-b border-gray-200">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <h3 className="text-base font-medium text-gray-900">Auto-Generate Payment Links</h3>
-                          <InfoTooltip text="Automatically create payment links for approved invoices" />
-                        </div>
-                        <ToggleSwitch 
-                          enabled={settings.autoGenerate}
-                          onChange={(value) => handleToggle('autoGenerate', value)}
-                        />
-                      </div>
-                      <p className="text-sm text-gray-600 mt-1">
-                        When enabled, a payment link will be generated for each approved invoice.
-                      </p>
-                    </div>
-                    
-                    {settings.autoGenerate && (
-                      <div className="px-3 py-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center">
-                            <span className="text-sm font-medium text-gray-700">Allow account-level disable</span>
-                            <InfoTooltip text="Individual accounts can override this setting" />
-                          </div>
-                          <ToggleSwitch 
-                            enabled={settings.accountLevelDisable}
-                            onChange={(value) => handleToggle('accountLevelDisable', value)}
-                          />
-                        </div>
-                        <p className="text-xs text-gray-500 mt-0.5">Default: Disabled</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Ad-hoc Payment Links */}
-                  <div className="bg-white rounded-lg border border-gray-200">
-                    <div className="px-3 py-3 border-b border-gray-200">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <h3 className="text-base font-medium text-gray-900">Ad-hoc Payment Links</h3>
-                          <InfoTooltip text="Allow manual creation of payment links for various purposes" />
-                        </div>
-                        <ToggleSwitch 
-                          enabled={settings.adHocEnabled}
-                          onChange={(value) => handleToggle('adHocEnabled', value)}
-                        />
-                      </div>
-                      <p className="text-sm text-gray-600 mt-1">
-                        When enabled, users can create payment links manually with configurable attribution.
-                      </p>
-                    </div>
-
-                    {settings.adHocEnabled && (
-                      <div className="px-3 py-2">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Attribution Types</h4>
-                        <p className="text-xs text-gray-500 mb-2">Select which attribution types are available</p>
-                        
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                              <span className="text-sm text-gray-700">Invoice</span>
-                              <span className="ml-1.5 text-xs text-gray-500">(Default)</span>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="bg-white rounded-lg shadow-lg max-w-7xl mx-auto">
+                    <div className="p-4">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {/* Auto-Generate Payment Links */}
+                        <div className="bg-white rounded-lg border border-gray-200">
+                          <div className="px-3 py-3 border-b border-gray-200">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                <h3 className="text-base font-medium text-gray-900">Auto-Generate Payment Links</h3>
+                                <InfoTooltip text="Automatically create payment links for approved invoices" />
+                              </div>
+                              <ToggleSwitch 
+                                enabled={settings.autoGenerate}
+                                onChange={(value) => handleToggle('autoGenerate', value)}
+                              />
                             </div>
-                            <ToggleSwitch 
-                              enabled={settings.attributionTypes.invoice}
-                              onChange={(value) => handleAttributionChange('invoice', value)}
-                            />
+                            <p className="text-sm text-gray-600 mt-1">
+                              When enabled, a payment link will be generated for each approved invoice.
+                            </p>
                           </div>
                           
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-700">Open Amount</span>
-                            <ToggleSwitch 
-                              enabled={settings.attributionTypes.openAmount}
-                              onChange={(value) => handleAttributionChange('openAmount', value)}
-                            />
+                          {settings.autoGenerate && (
+                            <div className="px-3 py-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center">
+                                  <span className="text-sm font-medium text-gray-700">Allow account-level disable</span>
+                                  <InfoTooltip text="Individual accounts can override this setting" />
+                                </div>
+                                <ToggleSwitch 
+                                  enabled={settings.accountLevelDisable}
+                                  onChange={(value) => handleToggle('accountLevelDisable', value)}
+                                />
+                              </div>
+                              <p className="text-xs text-gray-500 mt-0.5">Default: Disabled</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Ad-hoc Payment Links */}
+                        <div className="bg-white rounded-lg border border-gray-200">
+                          <div className="px-3 py-3 border-b border-gray-200">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                <h3 className="text-base font-medium text-gray-900">Ad-hoc Payment Links</h3>
+                                <InfoTooltip text="Allow manual creation of payment links for various purposes" />
+                              </div>
+                              <ToggleSwitch 
+                                enabled={settings.adHocEnabled}
+                                onChange={(value) => handleToggle('adHocEnabled', value)}
+                              />
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">
+                              When enabled, users can create payment links manually with configurable attribution.
+                            </p>
+                          </div>
+
+                          {settings.adHocEnabled && (
+                            <div className="px-3 py-2">
+                              <h4 className="text-sm font-medium text-gray-700 mb-2">Attribution Types</h4>
+                              <p className="text-xs text-gray-500 mb-2">Select which attribution types are available</p>
+                              
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center">
+                                    <span className="text-sm text-gray-700">Invoice</span>
+                                    <span className="ml-1.5 text-xs text-gray-500">(Default)</span>
+                                  </div>
+                                  <ToggleSwitch 
+                                    enabled={settings.attributionTypes.invoice}
+                                    onChange={(value) => handleAttributionChange('invoice', value)}
+                                  />
+                                </div>
+                                
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm text-gray-700">Open Amount</span>
+                                  <ToggleSwitch 
+                                    enabled={settings.attributionTypes.openAmount}
+                                    onChange={(value) => handleAttributionChange('openAmount', value)}
+                                  />
+                                </div>
+                                
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm text-gray-700">Account Balance</span>
+                                  <ToggleSwitch 
+                                    enabled={settings.attributionTypes.accountBalance}
+                                    onChange={(value) => handleAttributionChange('accountBalance', value)}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Payment Options */}
+                        <div className="bg-white rounded-lg border border-gray-200">
+                          <div className="px-3 py-3 border-b border-gray-200">
+                            <h3 className="text-base font-medium text-gray-900">Payment Options</h3>
                           </div>
                           
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-700">Account Balance</span>
-                            <ToggleSwitch 
-                              enabled={settings.attributionTypes.accountBalance}
-                              onChange={(value) => handleAttributionChange('accountBalance', value)}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Payment Options */}
-                  <div className="bg-white rounded-lg border border-gray-200">
-                    <div className="px-3 py-3 border-b border-gray-200">
-                      <h3 className="text-base font-medium text-gray-900">Payment Options</h3>
-                    </div>
-                    
-                    <div className="px-3 py-2 space-y-3">
-                      {/* Partial Payments */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <span className="text-sm font-medium text-gray-700">Allow Partial Payments</span>
-                          <InfoTooltip text="Customers can pay less than the full amount due" />
-                        </div>
-                        <ToggleSwitch 
-                          enabled={settings.allowPartialPayments}
-                          onChange={(value) => handleToggle('allowPartialPayments', value)}
-                        />
-                      </div>
-                      
-                      {settings.allowPartialPayments && (
-                        <div className="ml-4 pl-3 border-l-2 border-gray-100">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                              <span className="text-sm text-gray-700">Minimum partial payment</span>
-                              <InfoTooltip text="Set the minimum percentage that customers can pay" />
-                            </div>
-                            <div className="flex items-center space-x-1.5">
-                              <input
-                                type="number"
-                                min="1"
-                                max="99"
-                                value={settings.minimumPartialPayment}
-                                onChange={(e) => handleToggle('minimumPartialPayment', parseInt(e.target.value))}
-                                className="w-14 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          <div className="px-3 py-2 space-y-3">
+                            {/* Partial Payments */}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                <span className="text-sm font-medium text-gray-700">Allow Partial Payments</span>
+                                <InfoTooltip text="Customers can pay less than the full amount due" />
+                              </div>
+                              <ToggleSwitch 
+                                enabled={settings.allowPartialPayments}
+                                onChange={(value) => handleToggle('allowPartialPayments', value)}
                               />
-                              <span className="text-sm text-gray-500">%</span>
                             </div>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Overpayments */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <span className="text-sm font-medium text-gray-700">Allow Overpayments</span>
-                          <InfoTooltip text="Customers can pay more than the amount due" />
-                        </div>
-                        <ToggleSwitch 
-                          enabled={settings.allowOverpayments}
-                          onChange={(value) => handleToggle('allowOverpayments', value)}
-                        />
-                      </div>
-                      
-                      {settings.allowOverpayments && (
-                        <div className="ml-4 pl-3 border-l-2 border-gray-100">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                              <span className="text-sm text-gray-700">Maximum overpayment</span>
-                              <InfoTooltip text="Set the maximum percentage customers can overpay" />
-                            </div>
-                            <div className="flex items-center space-x-1.5">
-                              <input
-                                type="number"
-                                min="101"
-                                max="500"
-                                value={settings.maximumOverpayment}
-                                onChange={(e) => handleToggle('maximumOverpayment', parseInt(e.target.value))}
-                                className="w-14 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            
+                            {settings.allowPartialPayments && (
+                              <div className="ml-4 pl-3 border-l-2 border-gray-100">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center">
+                                    <span className="text-sm text-gray-700">Minimum partial payment</span>
+                                    <InfoTooltip text="Set the minimum percentage that customers can pay" />
+                                  </div>
+                                  <div className="flex items-center space-x-1.5">
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      max="99"
+                                      value={settings.minimumPartialPayment}
+                                      onChange={(e) => handleToggle('minimumPartialPayment', parseInt(e.target.value))}
+                                      className="w-14 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                    <span className="text-sm text-gray-500">%</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Overpayments */}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                <span className="text-sm font-medium text-gray-700">Allow Overpayments</span>
+                                <InfoTooltip text="Customers can pay more than the amount due" />
+                              </div>
+                              <ToggleSwitch 
+                                enabled={settings.allowOverpayments}
+                                onChange={(value) => handleToggle('allowOverpayments', value)}
                               />
-                              <span className="text-sm text-gray-500">%</span>
                             </div>
+                            
+                            {settings.allowOverpayments && (
+                              <div className="ml-4 pl-3 border-l-2 border-gray-100">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center">
+                                    <span className="text-sm text-gray-700">Maximum overpayment</span>
+                                    <InfoTooltip text="Set the maximum percentage customers can overpay" />
+                                  </div>
+                                  <div className="flex items-center space-x-1.5">
+                                    <input
+                                      type="number"
+                                      min="101"
+                                      max="500"
+                                      value={settings.maximumOverpayment}
+                                      onChange={(e) => handleToggle('maximumOverpayment', parseInt(e.target.value))}
+                                      className="w-14 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                    <span className="text-sm text-gray-500">%</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
-                      )}
-                    </div>
-                  </div>
 
-                  {/* Display Options */}
-                  <div className="bg-white rounded-lg border border-gray-200">
-                    <div className="px-3 py-3 border-b border-gray-200">
-                      <h3 className="text-base font-medium text-gray-900">Display Options</h3>
-                    </div>
-                    
-                    <div className="px-3 py-2 space-y-3">
-                      {/* Link Expiration */}
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center">
-                            <span className="text-sm font-medium text-gray-700">Link Expiration</span>
-                            <InfoTooltip text="Set how many days payment links remain active before expiring" />
+                        {/* Display Options */}
+                        <div className="bg-white rounded-lg border border-gray-200">
+                          <div className="px-3 py-3 border-b border-gray-200">
+                            <h3 className="text-base font-medium text-gray-900">Display Options</h3>
                           </div>
-                          <div className="flex items-center space-x-1.5">
-                            <input
-                              type="number"
-                              value={settings.linkExpirationDays}
-                              onChange={(e) => handleToggle('linkExpirationDays', parseInt(e.target.value) || 90)}
-                              min="1"
-                              max="365"
-                              className="w-16 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            />
-                            <span className="text-sm text-gray-500">days</span>
+                          
+                          <div className="px-3 py-2 space-y-3">
+                            {/* Link Expiration */}
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <div className="flex items-center">
+                                  <span className="text-sm font-medium text-gray-700">Link Expiration</span>
+                                  <InfoTooltip text="Set how many days payment links remain active before expiring" />
+                                </div>
+                                <div className="flex items-center space-x-1.5">
+                                  <input
+                                    type="number"
+                                    value={settings.linkExpirationDays}
+                                    onChange={(e) => handleToggle('linkExpirationDays', parseInt(e.target.value) || 90)}
+                                    min="1"
+                                    max="365"
+                                    className="w-16 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                  />
+                                  <span className="text-sm text-gray-500">days</span>
+                                </div>
+                              </div>
+                              <p className="text-xs text-gray-500">Payment links will automatically expire after this period</p>
+                            </div>
+
+                            {/* Invoice Details Visibility */}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                <span className="text-sm font-medium text-gray-700">Show Invoice Details</span>
+                                <InfoTooltip text="Display invoice information section on payment link pages" />
+                              </div>
+                              <ToggleSwitch 
+                                enabled={settings.showInvoiceDetails}
+                                onChange={(value) => handleToggle('showInvoiceDetails', value)}
+                              />
+                            </div>
+
+                            {/* PDF Options */}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                <span className="text-sm font-medium text-gray-700">Enable PDF Preview & Download</span>
+                                <InfoTooltip text="Allow customers to preview and download invoice PDFs" />
+                              </div>
+                              <ToggleSwitch 
+                                enabled={settings.enablePdfOptions}
+                                onChange={(value) => handleToggle('enablePdfOptions', value)}
+                                disabled={!settings.showInvoiceDetails}
+                              />
+                            </div>
+                            {!settings.showInvoiceDetails && (
+                              <p className="text-xs text-gray-500 ml-4">PDF options require invoice details to be shown</p>
+                            )}
                           </div>
                         </div>
-                        <p className="text-xs text-gray-500">Payment links will automatically expire after this period</p>
                       </div>
-
-                      {/* Invoice Details Visibility */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <span className="text-sm font-medium text-gray-700">Show Invoice Details</span>
-                          <InfoTooltip text="Display invoice information section on payment link pages" />
-                        </div>
-                        <ToggleSwitch 
-                          enabled={settings.showInvoiceDetails}
-                          onChange={(value) => handleToggle('showInvoiceDetails', value)}
-                        />
-                      </div>
-
-                      {/* PDF Options */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <span className="text-sm font-medium text-gray-700">Enable PDF Preview & Download</span>
-                          <InfoTooltip text="Allow customers to preview and download invoice PDFs" />
-                        </div>
-                        <ToggleSwitch 
-                          enabled={settings.enablePdfOptions}
-                          onChange={(value) => handleToggle('enablePdfOptions', value)}
-                          disabled={!settings.showInvoiceDetails}
-                        />
-                      </div>
-                      {!settings.showInvoiceDetails && (
-                        <p className="text-xs text-gray-500 ml-4">PDF options require invoice details to be shown</p>
-                      )}
                     </div>
                   </div>
                 </div>
