@@ -447,13 +447,7 @@ const PaymentLinksPrototype = () => {
             ) : (
               <div className="px-3 py-2 bg-white border-t border-gray-100">
                 <div className="text-center">
-                  <p className="text-xs text-gray-600 mb-2">Set your name to add comments</p>
-                  <button
-                    onClick={handleStartEditingName}
-                    className="px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
-                  >
-                    Set Name
-                  </button>
+                  <p className="text-xs text-gray-600">Please set your name in the profile section above to add comments</p>
                 </div>
               </div>
             )}
