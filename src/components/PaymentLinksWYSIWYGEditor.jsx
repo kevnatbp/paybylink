@@ -5,6 +5,9 @@ const PaymentLinksWYSIWYGEditor = () => {
   const [activeTab, setActiveTab] = useState('preview');
   const [newComment, setNewComment] = useState('');
   const [comments, setComments] = useState([]);
+  const [userName, setUserName] = useState('');
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [tempUserName, setTempUserName] = useState('');
   const [adHocForm, setAdHocForm] = useState({
     attributionType: 'invoice',
     selectedInvoice: '',
@@ -33,23 +36,6 @@ const PaymentLinksWYSIWYGEditor = () => {
 
   const [paymentAmount, setPaymentAmount] = useState('125.00');
   const [paymentType, setPaymentType] = useState('credit');
-
-  // Load comments from localStorage on mount
-  useEffect(() => {
-    const savedComments = localStorage.getItem('paymentLinksComments');
-    if (savedComments) {
-      try {
-        setComments(JSON.parse(savedComments));
-      } catch (error) {
-        console.warn('Failed to load comments:', error);
-      }
-    }
-  }, []);
-
-  // Save comments to localStorage whenever comments change
-  useEffect(() => {
-    localStorage.setItem('paymentLinksComments', JSON.stringify(comments));
-  }, [comments]);
 
   // Sample data for ad-hoc creation
   const availableInvoices = [
@@ -84,6 +70,31 @@ const PaymentLinksWYSIWYGEditor = () => {
     }));
   };
 
+  const handleStartEditingName = () => {
+    setTempUserName(userName);
+    setIsEditingName(true);
+  };
+
+  const handleSaveName = () => {
+    if (tempUserName.trim()) {
+      setUserName(tempUserName.trim());
+      setIsEditingName(false);
+    }
+  };
+
+  const handleCancelEditName = () => {
+    setIsEditingName(false);
+    setTempUserName('');
+  };
+
+  const handleNameKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleSaveName();
+    } else if (e.key === 'Escape') {
+      handleCancelEditName();
+    }
+  };
+
   const handlePayment = () => {
     console.log('Processing payment of:', paymentAmount);
   };
@@ -115,7 +126,7 @@ const PaymentLinksWYSIWYGEditor = () => {
 
   const handleCreateAdHocLink = () => {
     console.log('Creating ad-hoc payment link:', adHocForm);
-    setShowAdHocModal(false);
+    setActiveTab('preview');
     setAdHocForm({
       attributionType: 'invoice',
       selectedInvoice: '',
@@ -155,13 +166,13 @@ const PaymentLinksWYSIWYGEditor = () => {
     }));
   };
 
-  
+  // Fixed: Now uses the actual userName instead of hardcoded 'User'
   const handleAddComment = () => {
-    if (newComment.trim()) {
+    if (newComment.trim() && userName.trim()) {
       const comment = {
         id: Date.now(),
         text: newComment,
-        author: 'User', // In a real app, this would be the logged-in user
+        author: userName, // Now uses the actual user name!
         timestamp: new Date().toLocaleString(),
         tab: activeTab
       };
@@ -177,33 +188,53 @@ const PaymentLinksWYSIWYGEditor = () => {
     }
   };
 
+  // Helper function to get user initials for avatar
+  const getUserInitials = (name) => {
+    return name
+      .split(' ')
+      .map(part => part.charAt(0))
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  // Helper function to generate avatar color based on name
+  const getAvatarColor = (name) => {
+    const colors = [
+      'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 
+      'bg-indigo-500', 'bg-red-500', 'bg-yellow-500', 'bg-teal-500'
+    ];
+    const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return colors[hash % colors.length];
+  };
+
   const ToggleSwitch = ({ enabled, onChange, disabled = false }) => (
     <button
       onClick={() => !disabled && onChange(!enabled)}
       disabled={disabled}
       className={`
-        relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+        relative inline-flex h-5 w-10 items-center rounded-full transition-colors
         ${enabled ? 'bg-blue-600' : 'bg-gray-200'}
         ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
       `}
     >
       <span
         className={`
-          inline-block h-4 w-4 transform rounded-full bg-white transition-transform
-          ${enabled ? 'translate-x-6' : 'translate-x-1'}
+          inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform
+          ${enabled ? 'translate-x-5' : 'translate-x-1'}
         `}
       />
     </button>
   );
 
   const InfoTooltip = ({ text }) => (
-    <div className="group relative inline-block ml-2">
-      <svg className="h-4 w-4 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div className="group relative inline-block ml-1">
+      <svg className="h-3.5 w-3.5 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <circle cx="12" cy="12" r="10"/>
         <path d="m9,9 0,0a3,3 0 1,1 6,0c0,2 -3,3 -3,3"/>
         <path d="m12,17 .01,0"/>
       </svg>
-      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
         {text}
       </div>
     </div>
@@ -213,38 +244,95 @@ const PaymentLinksWYSIWYGEditor = () => {
     <button
       onClick={() => onClick(id)}
       className={`
-        w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors
+        w-full flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-colors
         ${isActive 
           ? 'bg-blue-600 text-white' 
           : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
         }
       `}
     >
-      <Icon className="h-5 w-5 mr-3" />
+      <Icon className="h-4 w-4 mr-2" />
       {label}
     </button>
   );
 
   return (
-      <div className="h-screen flex flex-col overflow-hidden bg-gray-100">
-        {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-3 flex-shrink-0">
+    <div className="h-screen flex flex-col overflow-hidden bg-gray-100">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-4 py-2 flex-shrink-0">
         <div className="flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-gray-900">Payment Links Prototype</h1>
-          <button className="bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-blue-700 flex items-center">
-            <Save className="h-4 w-4 mr-2" />
+          <h1 className="text-base font-semibold text-gray-900">Pay By Link</h1>
+          {/* <button className="bg-blue-600 text-white px-3 py-1 rounded-md text-sm font-medium hover:bg-blue-700 flex items-center">
+            <Save className="h-3.5 w-3.5 mr-1.5" />
             Save
-          </button>
+          </button> */}
         </div>
       </div>
 
       {/* Main Layout */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar */}
-        <div className="w-80 bg-white border-r border-gray-200 flex-shrink-0 flex flex-col">
+        <div className="w-72 bg-white border-r border-gray-200 flex-shrink-0 flex flex-col">
+          {/* User Profile Section */}
+          <div className="p-3 border-b border-gray-200 bg-gray-50">
+            {!userName && !isEditingName ? (
+              <div className="text-center">
+                <p className="text-xs text-gray-600 mb-2">Set your name to start commenting</p>
+                <button
+                  onClick={handleStartEditingName}
+                  className="px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
+                >
+                  Set Name
+                </button>
+              </div>
+            ) : isEditingName ? (
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={tempUserName}
+                  onChange={(e) => setTempUserName(e.target.value)}
+                  onKeyDown={handleNameKeyPress}
+                  placeholder="Enter your name"
+                  className="block w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  autoFocus
+                />
+                <div className="flex space-x-2">
+                  <button
+                    onClick={handleSaveName}
+                    disabled={!tempUserName.trim()}
+                    className="flex-1 px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={handleCancelEditName}
+                    className="flex-1 px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className={`h-6 w-6 rounded-full flex items-center justify-center mr-2 text-white text-xs font-medium ${getAvatarColor(userName)}`}>
+                    {getUserInitials(userName)}
+                  </div>
+                  <span className="text-sm font-medium text-gray-900">{userName}</span>
+                </div>
+                <button
+                  onClick={handleStartEditingName}
+                  className="text-xs text-blue-600 hover:text-blue-700"
+                >
+                  Edit
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Navigation */}
-          <div className="p-4 border-b border-gray-200">
-            <nav className="space-y-2">
+          <div className="p-3 border-b border-gray-200">
+            <nav className="space-y-1">
               <SidebarNavItem
                 id="preview"
                 icon={Eye}
@@ -270,75 +358,85 @@ const PaymentLinksWYSIWYGEditor = () => {
           </div>
 
           {/* Comments Section */}
-          <div className="flex-1 flex flex-col min-h-0">
+          <div className="border-b border-gray-200">
             {/* Comments Header */}
-            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-              <div className="flex items-center text-xs font-medium text-gray-600 uppercase tracking-wide">
-                <MessageSquare className="h-4 w-4 mr-2" />
-                Comments - {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
-                <span className="ml-2 bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full text-xs">
+            <div className="px-3 py-2 bg-gray-50">
+              <div className="flex items-center justify-between text-xs font-medium text-gray-600">
+                <div className="flex items-center">
+                  <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+                  <span className="uppercase tracking-wide">Comments</span>
+                </div>
+                <span className="bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded-full text-xs">
                   {comments.filter(c => c.tab === activeTab).length}
                 </span>
               </div>
-            </div>
-
-            {/* Comments List */}
-            <div className="flex-1 overflow-y-auto px-4 py-3">
-              <div className="space-y-3">
-                {comments.filter(comment => comment.tab === activeTab).length === 0 ? (
-                  <div className="text-center py-6 text-gray-400">
-                    <MessageSquare className="h-6 w-6 mx-auto mb-2 text-gray-300" />
-                    <p className="text-xs">No comments for {activeTab}</p>
-                  </div>
-                ) : (
-                  comments
-                    .filter(comment => comment.tab === activeTab)
-                    .map((comment) => (
-                      <div key={comment.id} className="text-xs">
-                        <div className="flex items-start space-x-2 p-2 bg-gray-50 rounded border">
-                          <div className="flex-shrink-0">
-                            <div className="h-6 w-6 bg-blue-100 rounded-full flex items-center justify-center">
-                              <User className="h-3 w-3 text-blue-600" />
-                            </div>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center space-x-1 mb-1">
-                              <span className="font-medium text-gray-900">{comment.author}</span>
-                              <span className="text-gray-400">•</span>
-                              <span className="text-gray-500">{comment.timestamp}</span>
-                            </div>
-                            <p className="text-gray-700 leading-relaxed">{comment.text}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                )}
+              <div className="text-xs text-gray-500 mt-0.5">
+                {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Tab
               </div>
             </div>
 
             {/* Add Comment Form */}
-            <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
-              <div className="space-y-2">
+            {userName && (
+              <div className="px-3 py-2 bg-white border-t border-gray-100">
                 <textarea
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder={`Comment on ${activeTab}...`}
+                  placeholder={`Add a comment as ${userName}...`}
                   rows={2}
-                  className="block w-full px-2 py-1.5 text-xs border border-gray-300 rounded shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                  className="block w-full px-2 py-1 text-xs border border-gray-300 rounded shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-none"
                 />
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center mt-1.5">
                   <span className="text-xs text-gray-500">Enter to send</span>
                   <button
                     onClick={handleAddComment}
                     disabled={!newComment.trim()}
-                    className="flex items-center px-2 py-1 text-xs font-medium text-white bg-blue-600 border border-transparent rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center px-2 py-0.5 text-xs font-medium text-white bg-blue-600 border border-transparent rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Send className="h-3 w-3 mr-1" />
                     Send
                   </button>
                 </div>
               </div>
+            )}
+          </div>
+
+          {/* Comments List */}
+          <div className="flex-1 overflow-y-auto px-3 py-2">
+            <div className="space-y-2">
+              {!userName ? (
+                <div className="text-center py-4 text-gray-400">
+                  <p className="text-xs">Set your name above to start commenting</p>
+                </div>
+              ) : comments.filter(comment => comment.tab === activeTab).length === 0 ? (
+                <div className="text-center py-4 text-gray-400">
+                  <p className="text-xs">No comments yet</p>
+                  <p className="text-xs mt-1">Be the first to comment!</p>
+                </div>
+              ) : (
+                comments
+                  .filter(comment => comment.tab === activeTab)
+                  .sort((a, b) => b.id - a.id)
+                  .map((comment) => (
+                    <div key={comment.id} className="text-xs">
+                      <div className="flex items-start space-x-2 p-2 bg-gray-50 rounded border border-gray-200 hover:border-gray-300 transition-colors">
+                        <div className="flex-shrink-0">
+                          <div className={`h-5 w-5 rounded-full flex items-center justify-center text-white text-xs font-medium ${getAvatarColor(comment.author)}`}>
+                            {getUserInitials(comment.author)}
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-1 mb-0.5">
+                            <span className="font-medium text-gray-900">{comment.author}</span>
+                            <span className="text-gray-400">•</span>
+                            <span className="text-gray-500 text-xs">{comment.timestamp}</span>
+                          </div>
+                          <p className="text-gray-700 leading-relaxed break-words">{comment.text}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+              )}
             </div>
           </div>
         </div>
@@ -346,47 +444,47 @@ const PaymentLinksWYSIWYGEditor = () => {
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto">
-            <div className="p-6">
+            <div className="p-4">
               {activeTab === 'preview' && (
                 // Preview Mode
-                <div className="bg-gray-50 rounded-lg p-6">
+                <div className="bg-gray-50 rounded-lg p-4">
                   <div className="bg-white rounded-lg shadow-lg max-w-6xl mx-auto">
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 p-6">
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 p-4">
                       {/* Payment Form - Left Side */}
                       <div className="order-2 xl:order-1 bg-gray-50 rounded-lg border border-gray-200">
-                        <div className="px-6 py-4 border-b border-gray-200 bg-white rounded-t-lg">
-                          <h2 className="text-lg font-semibold text-gray-900">Make a Payment</h2>
+                        <div className="px-4 py-3 border-b border-gray-200 bg-white rounded-t-lg">
+                          <h2 className="text-base font-semibold text-gray-900">Make a Payment</h2>
                         </div>
                         
-                        <div className="p-6 bg-white rounded-b-lg">
+                        <div className="p-4 bg-white rounded-b-lg">
                           {/* Payment Amount */}
-                          <div className="mb-6">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Payment Amount</label>
+                          <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Payment Amount</label>
                             <div className="flex items-center">
                               <span className="text-sm text-gray-500 mr-2">USD</span>
                               <input
                                 type="number"
                                 value={paymentAmount}
                                 onChange={(e) => setPaymentAmount(e.target.value)}
-                                className="block w-40 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-lg font-semibold"
+                                className="block w-32 px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-base font-semibold"
                               />
                             </div>
                             {settings.allowPartialPayments && (
-                              <p className="text-xs text-gray-500 mt-1">
-                                Minimum payment: ${(parseFloat(invoice.amount) * settings.minimumPartialPayment / 100).toFixed(2)}
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                Minimum: ${(parseFloat(invoice.amount) * settings.minimumPartialPayment / 100).toFixed(2)}
                               </p>
                             )}
                             {settings.allowOverpayments && (
-                              <p className="text-xs text-gray-500 mt-1">
-                                Maximum payment: ${(parseFloat(invoice.amount) * settings.maximumOverpayment / 100).toFixed(2)}
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                Maximum: ${(parseFloat(invoice.amount) * settings.maximumOverpayment / 100).toFixed(2)}
                               </p>
                             )}
                           </div>
 
                           {/* Payment Method Selection */}
-                          <div className="mb-6">
-                            <h3 className="text-sm font-medium text-gray-700 mb-3">Payment Method</h3>
-                            <div className="flex space-x-4 mb-4">
+                          <div className="mb-4">
+                            <h3 className="text-sm font-medium text-gray-700 mb-2">Payment Method</h3>
+                            <div className="flex space-x-4 mb-3">
                               <label className="flex items-center">
                                 <input
                                   type="radio"
@@ -394,9 +492,9 @@ const PaymentLinksWYSIWYGEditor = () => {
                                   value="credit"
                                   checked={paymentType === 'credit'}
                                   onChange={(e) => setPaymentType(e.target.value)}
-                                  className="h-4 w-4 text-blue-600"
+                                  className="h-3.5 w-3.5 text-blue-600"
                                 />
-                                <span className="ml-2 text-sm text-gray-700">Credit Card</span>
+                                <span className="ml-1.5 text-sm text-gray-700">Credit Card</span>
                               </label>
                               <label className="flex items-center">
                                 <input
@@ -405,82 +503,82 @@ const PaymentLinksWYSIWYGEditor = () => {
                                   value="debit"
                                   checked={paymentType === 'debit'}
                                   onChange={(e) => setPaymentType(e.target.value)}
-                                  className="h-4 w-4 text-blue-600"
+                                  className="h-3.5 w-3.5 text-blue-600"
                                 />
-                                <span className="ml-2 text-sm text-gray-700">Direct Debit</span>
+                                <span className="ml-1.5 text-sm text-gray-700">Direct Debit</span>
                               </label>
                             </div>
 
                             {/* Payment Form Fields */}
-                            <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                              <div className="grid grid-cols-1 gap-4">
+                            <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                              <div className="grid grid-cols-1 gap-3">
                                 <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  <label className="block text-xs font-medium text-gray-700 mb-1">
                                     {paymentType === 'credit' ? 'Credit Card Number' : 'Account Number'} <span className="text-red-500">*</span>
                                   </label>
                                   <input
                                     type="text"
                                     placeholder={paymentType === 'credit' ? '4111 1111 1111 1111' : 'Account Number'}
-                                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                    className="block w-full px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                                   />
                                 </div>
                                 
                                 {paymentType === 'credit' ? (
-                                  <div className="grid grid-cols-2 gap-4">
+                                  <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
                                         Expiration Date <span className="text-red-500">*</span>
                                       </label>
                                       <input
                                         type="text"
                                         placeholder="MM/YYYY"
-                                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                        className="block w-full px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                                       />
                                     </div>
                                     
                                     <div>
-                                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
                                         CVC <span className="text-red-500">*</span>
                                       </label>
                                       <input
                                         type="text"
                                         placeholder="000"
-                                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                        className="block w-full px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                                       />
                                     </div>
                                   </div>
                                 ) : (
                                   <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">
                                       Routing Number <span className="text-red-500">*</span>
                                     </label>
                                     <input
                                       type="text"
                                       placeholder="123456789"
-                                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                      className="block w-full px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                                     />
                                   </div>
                                 )}
                                 
                                 <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  <label className="block text-xs font-medium text-gray-700 mb-1">
                                     Full Name <span className="text-red-500">*</span>
                                   </label>
                                   <input
                                     type="text"
                                     placeholder="Full Name"
-                                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                    className="block w-full px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                                   />
                                 </div>
                                 
                                 <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                  <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
                                   <input
                                     type="email"
                                     placeholder="email@example.com"
-                                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                    className="block w-full px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                                   />
-                                  <p className="text-xs text-gray-500 mt-1">Optional - for payment confirmation</p>
+                                  <p className="text-xs text-gray-500 mt-0.5">Optional - for payment confirmation</p>
                                 </div>
                               </div>
                             </div>
@@ -489,25 +587,25 @@ const PaymentLinksWYSIWYGEditor = () => {
                           {/* Pay Button */}
                           <button
                             onClick={handlePayment}
-                            className="w-full bg-blue-600 text-white py-4 px-4 rounded-md text-lg font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                            className="w-full bg-blue-600 text-white py-3 px-4 rounded-md text-base font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
                           >
                             Pay ${paymentAmount}
                           </button>
                           
-                          <p className="text-xs text-gray-500 text-center mt-2">
-                            Your payment will be processed securely. You will receive a confirmation email after payment.
+                          <p className="text-xs text-gray-500 text-center mt-1.5">
+                            Your payment will be processed securely.
                           </p>
                         </div>
                       </div>
 
                       {/* Invoice Details - Right Side */}
                       {settings.showInvoiceDetails && (
-                        <div className="order-1 xl:order-2 bg-white rounded-lg border border-gray-200 p-6">
-                          <div className="space-y-6">
+                        <div className="order-1 xl:order-2 bg-white rounded-lg border border-gray-200 p-4">
+                          <div className="space-y-4">
                             {/* Invoice Details */}
                             <div>
-                              <h3 className="text-lg font-semibold text-gray-900 mb-4">Invoice Details</h3>
-                              <div className="space-y-3">
+                              <h3 className="text-base font-semibold text-gray-900 mb-3">Invoice Details</h3>
+                              <div className="space-y-2">
                                 <div className="flex justify-between">
                                   <span className="text-sm text-gray-600">Invoice Number:</span>
                                   <span className="text-sm font-medium text-gray-900">{invoice.id}</span>
@@ -520,27 +618,27 @@ const PaymentLinksWYSIWYGEditor = () => {
                                   <span className="text-sm text-gray-600">Due Date:</span>
                                   <span className="text-sm font-medium text-gray-900">{invoice.dueDate}</span>
                                 </div>
-                                <div className="flex justify-between items-center pt-3 border-t border-gray-200">
-                                  <span className="text-base font-semibold text-gray-900">Total Amount Due:</span>
-                                  <span className="text-2xl font-bold text-gray-900">${invoice.amount}</span>
+                                <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                                  <span className="text-sm font-semibold text-gray-900">Total Amount Due:</span>
+                                  <span className="text-xl font-bold text-gray-900">${invoice.amount}</span>
                                 </div>
                               </div>
                               
                               {/* Invoice Actions */}
                               {settings.enablePdfOptions && (
-                                <div className="flex space-x-3 mt-4">
+                                <div className="flex space-x-2 mt-3">
                                   <button
                                     onClick={handlePreviewInvoice}
-                                    className="flex items-center px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                                    className="flex items-center px-2.5 py-1.5 text-xs text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
                                   >
-                                    <Eye className="h-4 w-4 mr-2" />
+                                    <Eye className="h-3.5 w-3.5 mr-1.5" />
                                     Preview
                                   </button>
                                   <button
                                     onClick={handleDownloadInvoice}
-                                    className="flex items-center px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                                    className="flex items-center px-2.5 py-1.5 text-xs text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
                                   >
-                                    <Download className="h-4 w-4 mr-2" />
+                                    <Download className="h-3.5 w-3.5 mr-1.5" />
                                     Download PDF
                                   </button>
                                 </div>
@@ -549,27 +647,27 @@ const PaymentLinksWYSIWYGEditor = () => {
 
                             {/* Invoice Description */}
                             <div>
-                              <h4 className="text-sm font-medium text-gray-900 mb-2">Description</h4>
-                              <p className="text-sm text-gray-600 bg-gray-50 rounded-lg p-3">{invoice.description}</p>
+                              <h4 className="text-sm font-medium text-gray-900 mb-1.5">Description</h4>
+                              <p className="text-sm text-gray-600 bg-gray-50 rounded-lg p-2.5">{invoice.description}</p>
                             </div>
 
                             {/* Merchant Information */}
                             <div>
-                              <h3 className="text-lg font-semibold text-gray-900 mb-3">Merchant Information</h3>
-                              <div className="bg-gray-50 rounded-lg p-4">
-                                <div className="space-y-2">
+                              <h3 className="text-base font-semibold text-gray-900 mb-2">Merchant Information</h3>
+                              <div className="bg-gray-50 rounded-lg p-3">
+                                <div className="space-y-1.5">
                                   <div>
                                     <span className="text-sm font-medium text-gray-900">{invoice.merchantName}</span>
                                   </div>
                                   <div>
-                                    <span className="text-sm text-gray-600">Email: </span>
-                                    <a href={`mailto:${invoice.merchantEmail}`} className="text-sm text-blue-600 hover:text-blue-700">
+                                    <span className="text-xs text-gray-600">Email: </span>
+                                    <a href={`mailto:${invoice.merchantEmail}`} className="text-xs text-blue-600 hover:text-blue-700">
                                       {invoice.merchantEmail}
                                     </a>
                                   </div>
                                   <div>
-                                    <span className="text-sm text-gray-600">Phone: </span>
-                                    <a href={`tel:${invoice.merchantPhone}`} className="text-sm text-blue-600 hover:text-blue-700">
+                                    <span className="text-xs text-gray-600">Phone: </span>
+                                    <a href={`tel:${invoice.merchantPhone}`} className="text-xs text-blue-600 hover:text-blue-700">
                                       {invoice.merchantPhone}
                                     </a>
                                   </div>
@@ -587,20 +685,20 @@ const PaymentLinksWYSIWYGEditor = () => {
               {activeTab === 'adhoc' && (
                 // Ad-hoc Link Creation Mode
                 <div className="max-w-4xl mx-auto">
-                  <div className="bg-white rounded-lg border border-gray-200 p-6">
-                    <div className="flex items-center justify-between mb-6">
+                  <div className="bg-white rounded-lg border border-gray-200 p-4">
+                    <div className="flex items-center justify-between mb-4">
                       <div>
-                        <h2 className="text-xl font-semibold text-gray-900">Create Ad-Hoc Payment Link</h2>
-                        <p className="text-sm text-gray-600 mt-1">Generate a custom payment link for invoices, open amounts, or account balances</p>
+                        <h2 className="text-lg font-semibold text-gray-900">Create Ad-Hoc Payment Link</h2>
+                        <p className="text-sm text-gray-600 mt-0.5">Generate a custom payment link</p>
                       </div>
                     </div>
 
                     {/* Attribution Type Selection */}
-                    <div className="mb-6">
-                      <label className="block text-sm font-medium text-gray-700 mb-3">Attribution Type</label>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Attribution Type</label>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         {getEnabledAttributionTypes().includes('invoice') && (
-                          <label className={`cursor-pointer rounded-lg border-2 p-4 ${
+                          <label className={`cursor-pointer rounded-lg border-2 p-3 ${
                             adHocForm.attributionType === 'invoice' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
                           }`}>
                             <input
@@ -612,17 +710,17 @@ const PaymentLinksWYSIWYGEditor = () => {
                               className="sr-only"
                             />
                             <div className="text-center">
-                              <svg className="mx-auto h-8 w-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="mx-auto h-6 w-6 text-gray-400 mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                               </svg>
                               <h3 className="text-sm font-medium text-gray-900">Invoice</h3>
-                              <p className="text-xs text-gray-500 mt-1">Link to specific invoice</p>
+                              <p className="text-xs text-gray-500 mt-0.5">Link to specific invoice</p>
                             </div>
                           </label>
                         )}
 
                         {getEnabledAttributionTypes().includes('openAmount') && (
-                          <label className={`cursor-pointer rounded-lg border-2 p-4 ${
+                          <label className={`cursor-pointer rounded-lg border-2 p-3 ${
                             adHocForm.attributionType === 'openAmount' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
                           }`}>
                             <input
@@ -634,17 +732,17 @@ const PaymentLinksWYSIWYGEditor = () => {
                               className="sr-only"
                             />
                             <div className="text-center">
-                              <svg className="mx-auto h-8 w-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="mx-auto h-6 w-6 text-gray-400 mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                               </svg>
                               <h3 className="text-sm font-medium text-gray-900">Open Amount</h3>
-                              <p className="text-xs text-gray-500 mt-1">Custom payment amount</p>
+                              <p className="text-xs text-gray-500 mt-0.5">Custom payment amount</p>
                             </div>
                           </label>
                         )}
 
                         {getEnabledAttributionTypes().includes('accountBalance') && (
-                          <label className={`cursor-pointer rounded-lg border-2 p-4 ${
+                          <label className={`cursor-pointer rounded-lg border-2 p-3 ${
                             adHocForm.attributionType === 'accountBalance' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
                           }`}>
                             <input
@@ -656,26 +754,26 @@ const PaymentLinksWYSIWYGEditor = () => {
                               className="sr-only"
                             />
                             <div className="text-center">
-                              <svg className="mx-auto h-8 w-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="mx-auto h-6 w-6 text-gray-400 mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                               </svg>
                               <h3 className="text-sm font-medium text-gray-900">Account Balance</h3>
-                              <p className="text-xs text-gray-500 mt-1">Total account balance</p>
+                              <p className="text-xs text-gray-500 mt-0.5">Total account balance</p>
                             </div>
                           </label>
                         )}
                       </div>
                     </div>
 
-                    {/* Dynamic Form Fields Based on Attribution Type */}
-                    <div className="space-y-6">
+                    {/* Dynamic Form Fields */}
+                    <div className="space-y-4">
                       {adHocForm.attributionType === 'invoice' && (
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Select Invoice</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1.5">Select Invoice</label>
                           <select
                             value={adHocForm.selectedInvoice}
                             onChange={(e) => handleAdHocFormChange('selectedInvoice', e.target.value)}
-                            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            className="block w-full px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                           >
                             <option value="">Choose an invoice...</option>
                             {availableInvoices.map(inv => (
@@ -689,7 +787,7 @@ const PaymentLinksWYSIWYGEditor = () => {
 
                       {adHocForm.attributionType === 'openAmount' && (
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Payment Amount</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1.5">Payment Amount</label>
                           <div className="flex items-center">
                             <span className="text-sm text-gray-500 mr-2">USD</span>
                             <input
@@ -699,7 +797,7 @@ const PaymentLinksWYSIWYGEditor = () => {
                               placeholder="0.00"
                               min="0"
                               step="0.01"
-                              className="block w-40 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                              className="block w-32 px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                             />
                           </div>
                         </div>
@@ -707,11 +805,11 @@ const PaymentLinksWYSIWYGEditor = () => {
 
                       {adHocForm.attributionType === 'accountBalance' && (
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Select Account</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1.5">Select Account</label>
                           <select
                             value={adHocForm.accountId}
                             onChange={(e) => handleAdHocFormChange('accountId', e.target.value)}
-                            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            className="block w-full px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                           >
                             <option value="">Choose an account...</option>
                             {availableAccounts.map(acc => (
@@ -725,18 +823,18 @@ const PaymentLinksWYSIWYGEditor = () => {
 
                       {/* Common Fields */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Description (Optional)</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Description (Optional)</label>
                         <textarea
                           value={adHocForm.description}
                           onChange={(e) => handleAdHocFormChange('description', e.target.value)}
                           placeholder="Add a description for this payment link..."
-                          rows={3}
-                          className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                          rows={2}
+                          className="block w-full px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Link Expiration</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Link Expiration</label>
                         <div className="flex items-center">
                           <input
                             type="number"
@@ -744,25 +842,25 @@ const PaymentLinksWYSIWYGEditor = () => {
                             onChange={(e) => handleAdHocFormChange('expirationDays', parseInt(e.target.value))}
                             min="1"
                             max="365"
-                            className="block w-20 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            className="block w-16 px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                           />
                           <span className="ml-2 text-sm text-gray-500">days</span>
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">Payment link will expire after this many days</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Payment link will expire after this many days</p>
                       </div>
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex justify-end space-x-3 mt-8 pt-6 border-t border-gray-200">
+                    <div className="flex justify-end space-x-2 mt-6 pt-4 border-t border-gray-200">
                       <button
                         onClick={() => setActiveTab('preview')}
-                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                        className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
                       >
                         Cancel
                       </button>
                       <button
                         onClick={handleCreateAdHocLink}
-                        className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
+                        className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
                       >
                         Create Payment Link
                       </button>
@@ -773,13 +871,13 @@ const PaymentLinksWYSIWYGEditor = () => {
 
               {activeTab === 'settings' && (
                 // Settings Mode
-                <div className="space-y-8 max-w-4xl mx-auto">
+                <div className="space-y-4 max-w-4xl mx-auto">
                   
                   {/* Auto-Generate Payment Links */}
-                  <div className="bg-white rounded-lg border border-gray-200 p-6">
-                    <div className="flex items-center justify-between mb-4">
+                  <div className="bg-white rounded-lg border border-gray-200 p-4">
+                    <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center">
-                        <h3 className="text-lg font-medium text-gray-900">Auto-Generate Payment Links</h3>
+                        <h3 className="text-base font-medium text-gray-900">Auto-Generate Payment Links</h3>
                         <InfoTooltip text="Automatically create payment links for approved invoices" />
                       </div>
                       <ToggleSwitch 
@@ -787,12 +885,12 @@ const PaymentLinksWYSIWYGEditor = () => {
                         onChange={(value) => handleToggle('autoGenerate', value)}
                       />
                     </div>
-                    <p className="text-sm text-gray-600 mb-4">
+                    <p className="text-sm text-gray-600 mb-3">
                       When enabled, a payment link will be generated for each approved invoice.
                     </p>
                     
                     {settings.autoGenerate && (
-                      <div className="ml-4 pl-4 border-l-2 border-gray-100">
+                      <div className="ml-4 pl-3 border-l-2 border-gray-100">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center">
                             <span className="text-sm font-medium text-gray-700">Allow account-level disable</span>
@@ -803,16 +901,16 @@ const PaymentLinksWYSIWYGEditor = () => {
                             onChange={(value) => handleToggle('accountLevelDisable', value)}
                           />
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">Default: Disabled</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Default: Disabled</p>
                       </div>
                     )}
                   </div>
 
                   {/* Ad-hoc Payment Links */}
-                  <div className="bg-white rounded-lg border border-gray-200 p-6">
-                    <div className="flex items-center justify-between mb-4">
+                  <div className="bg-white rounded-lg border border-gray-200 p-4">
+                    <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center">
-                        <h3 className="text-lg font-medium text-gray-900">Ad-hoc Payment Links</h3>
+                        <h3 className="text-base font-medium text-gray-900">Ad-hoc Payment Links</h3>
                         <InfoTooltip text="Allow manual creation of payment links for various purposes" />
                       </div>
                       <ToggleSwitch 
@@ -820,20 +918,20 @@ const PaymentLinksWYSIWYGEditor = () => {
                         onChange={(value) => handleToggle('adHocEnabled', value)}
                       />
                     </div>
-                    <p className="text-sm text-gray-600 mb-4">
+                    <p className="text-sm text-gray-600 mb-3">
                       When enabled, users can create payment links manually with configurable attribution.
                     </p>
 
                     {settings.adHocEnabled && (
-                      <div className="ml-4 pl-4 border-l-2 border-gray-100">
-                        <h4 className="text-sm font-medium text-gray-700 mb-3">Attribution Types</h4>
-                        <p className="text-xs text-gray-500 mb-3">Select which attribution types are available when creating ad-hoc payment links</p>
+                      <div className="ml-4 pl-3 border-l-2 border-gray-100">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Attribution Types</h4>
+                        <p className="text-xs text-gray-500 mb-2">Select which attribution types are available</p>
                         
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center">
                               <span className="text-sm text-gray-700">Invoice</span>
-                              <span className="ml-2 text-xs text-gray-500">(Default)</span>
+                              <span className="ml-1.5 text-xs text-gray-500">(Default)</span>
                             </div>
                             <ToggleSwitch 
                               enabled={settings.attributionTypes.invoice}
@@ -862,10 +960,10 @@ const PaymentLinksWYSIWYGEditor = () => {
                   </div>
 
                   {/* Payment Options */}
-                  <div className="bg-white rounded-lg border border-gray-200 p-6">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Payment Options</h3>
+                  <div className="bg-white rounded-lg border border-gray-200 p-4">
+                    <h3 className="text-base font-medium text-gray-900 mb-3">Payment Options</h3>
                     
-                    <div className="space-y-6">
+                    <div className="space-y-4">
                       {/* Partial Payments */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
@@ -879,20 +977,20 @@ const PaymentLinksWYSIWYGEditor = () => {
                       </div>
                       
                       {settings.allowPartialPayments && (
-                        <div className="ml-4 pl-4 border-l-2 border-gray-100">
+                        <div className="ml-4 pl-3 border-l-2 border-gray-100">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center">
                               <span className="text-sm text-gray-700">Minimum partial payment</span>
                               <InfoTooltip text="Set the minimum percentage that customers can pay" />
                             </div>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-1.5">
                               <input
                                 type="number"
                                 min="1"
                                 max="99"
                                 value={settings.minimumPartialPayment}
                                 onChange={(e) => handleToggle('minimumPartialPayment', parseInt(e.target.value))}
-                                className="w-16 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="w-14 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                               />
                               <span className="text-sm text-gray-500">%</span>
                             </div>
@@ -913,20 +1011,20 @@ const PaymentLinksWYSIWYGEditor = () => {
                       </div>
                       
                       {settings.allowOverpayments && (
-                        <div className="ml-4 pl-4 border-l-2 border-gray-100">
+                        <div className="ml-4 pl-3 border-l-2 border-gray-100">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center">
                               <span className="text-sm text-gray-700">Maximum overpayment</span>
                               <InfoTooltip text="Set the maximum percentage customers can overpay" />
                             </div>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-1.5">
                               <input
                                 type="number"
                                 min="101"
                                 max="500"
                                 value={settings.maximumOverpayment}
                                 onChange={(e) => handleToggle('maximumOverpayment', parseInt(e.target.value))}
-                                className="w-16 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="w-14 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                               />
                               <span className="text-sm text-gray-500">%</span>
                             </div>
@@ -937,13 +1035,13 @@ const PaymentLinksWYSIWYGEditor = () => {
                   </div>
 
                   {/* Display Options */}
-                  <div className="bg-white rounded-lg border border-gray-200 p-6">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Display Options</h3>
+                  <div className="bg-white rounded-lg border border-gray-200 p-4">
+                    <h3 className="text-base font-medium text-gray-900 mb-3">Display Options</h3>
                     
-                    <div className="space-y-6">
+                    <div className="space-y-4">
                       {/* Link Expiration */}
                       <div>
-                        <div className="flex items-center mb-3">
+                        <div className="flex items-center mb-2">
                           <span className="text-sm font-medium text-gray-700">Link Expiration</span>
                           <InfoTooltip text="Set how many days payment links remain active before expiring" />
                         </div>
@@ -954,11 +1052,11 @@ const PaymentLinksWYSIWYGEditor = () => {
                             onChange={(e) => handleToggle('linkExpirationDays', parseInt(e.target.value) || 90)}
                             min="1"
                             max="365"
-                            className="block w-20 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            className="block w-16 px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                           />
                           <span className="ml-2 text-sm text-gray-500">days</span>
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">Payment links will automatically expire after this period</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Payment links will automatically expire after this period</p>
                       </div>
 
                       {/* Invoice Details Visibility */}
