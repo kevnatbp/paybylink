@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Eye, Settings, Download, Plus, MessageSquare, Send, User } from 'lucide-react';
+import { Eye, Settings, Download, Plus, MessageSquare, Send, User } from 'lucide-react';
 
-const PaymentLinksWYSIWYGEditor = () => {
+const PaymentLinksPrototype = () => {
   const [activeTab, setActiveTab] = useState('preview');
   const [newComment, setNewComment] = useState('');
   const [comments, setComments] = useState([]);
@@ -258,17 +258,6 @@ const PaymentLinksWYSIWYGEditor = () => {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-gray-100">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-2 flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <h1 className="text-base font-semibold text-gray-900">Pay By Link</h1>
-          {/* <button className="bg-blue-600 text-white px-3 py-1 rounded-md text-sm font-medium hover:bg-blue-700 flex items-center">
-            <Save className="h-3.5 w-3.5 mr-1.5" />
-            Save
-          </button> */}
-        </div>
-      </div>
-
       {/* Main Layout */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar */}
@@ -871,26 +860,28 @@ const PaymentLinksWYSIWYGEditor = () => {
 
               {activeTab === 'settings' && (
                 // Settings Mode
-                <div className="space-y-4 max-w-4xl mx-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-7xl mx-auto">
                   
                   {/* Auto-Generate Payment Links */}
-                  <div className="bg-white rounded-lg border border-gray-200 p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center">
-                        <h3 className="text-base font-medium text-gray-900">Auto-Generate Payment Links</h3>
-                        <InfoTooltip text="Automatically create payment links for approved invoices" />
+                  <div className="bg-white rounded-lg border border-gray-200">
+                    <div className="px-3 py-3 border-b border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <h3 className="text-base font-medium text-gray-900">Auto-Generate Payment Links</h3>
+                          <InfoTooltip text="Automatically create payment links for approved invoices" />
+                        </div>
+                        <ToggleSwitch 
+                          enabled={settings.autoGenerate}
+                          onChange={(value) => handleToggle('autoGenerate', value)}
+                        />
                       </div>
-                      <ToggleSwitch 
-                        enabled={settings.autoGenerate}
-                        onChange={(value) => handleToggle('autoGenerate', value)}
-                      />
+                      <p className="text-sm text-gray-600 mt-1">
+                        When enabled, a payment link will be generated for each approved invoice.
+                      </p>
                     </div>
-                    <p className="text-sm text-gray-600 mb-3">
-                      When enabled, a payment link will be generated for each approved invoice.
-                    </p>
                     
                     {settings.autoGenerate && (
-                      <div className="ml-4 pl-3 border-l-2 border-gray-100">
+                      <div className="px-3 py-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center">
                             <span className="text-sm font-medium text-gray-700">Allow account-level disable</span>
@@ -907,23 +898,25 @@ const PaymentLinksWYSIWYGEditor = () => {
                   </div>
 
                   {/* Ad-hoc Payment Links */}
-                  <div className="bg-white rounded-lg border border-gray-200 p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center">
-                        <h3 className="text-base font-medium text-gray-900">Ad-hoc Payment Links</h3>
-                        <InfoTooltip text="Allow manual creation of payment links for various purposes" />
+                  <div className="bg-white rounded-lg border border-gray-200">
+                    <div className="px-3 py-3 border-b border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <h3 className="text-base font-medium text-gray-900">Ad-hoc Payment Links</h3>
+                          <InfoTooltip text="Allow manual creation of payment links for various purposes" />
+                        </div>
+                        <ToggleSwitch 
+                          enabled={settings.adHocEnabled}
+                          onChange={(value) => handleToggle('adHocEnabled', value)}
+                        />
                       </div>
-                      <ToggleSwitch 
-                        enabled={settings.adHocEnabled}
-                        onChange={(value) => handleToggle('adHocEnabled', value)}
-                      />
+                      <p className="text-sm text-gray-600 mt-1">
+                        When enabled, users can create payment links manually with configurable attribution.
+                      </p>
                     </div>
-                    <p className="text-sm text-gray-600 mb-3">
-                      When enabled, users can create payment links manually with configurable attribution.
-                    </p>
 
                     {settings.adHocEnabled && (
-                      <div className="ml-4 pl-3 border-l-2 border-gray-100">
+                      <div className="px-3 py-2">
                         <h4 className="text-sm font-medium text-gray-700 mb-2">Attribution Types</h4>
                         <p className="text-xs text-gray-500 mb-2">Select which attribution types are available</p>
                         
@@ -960,10 +953,12 @@ const PaymentLinksWYSIWYGEditor = () => {
                   </div>
 
                   {/* Payment Options */}
-                  <div className="bg-white rounded-lg border border-gray-200 p-4">
-                    <h3 className="text-base font-medium text-gray-900 mb-3">Payment Options</h3>
+                  <div className="bg-white rounded-lg border border-gray-200">
+                    <div className="px-3 py-3 border-b border-gray-200">
+                      <h3 className="text-base font-medium text-gray-900">Payment Options</h3>
+                    </div>
                     
-                    <div className="space-y-4">
+                    <div className="px-3 py-2 space-y-3">
                       {/* Partial Payments */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
@@ -1035,28 +1030,32 @@ const PaymentLinksWYSIWYGEditor = () => {
                   </div>
 
                   {/* Display Options */}
-                  <div className="bg-white rounded-lg border border-gray-200 p-4">
-                    <h3 className="text-base font-medium text-gray-900 mb-3">Display Options</h3>
+                  <div className="bg-white rounded-lg border border-gray-200">
+                    <div className="px-3 py-3 border-b border-gray-200">
+                      <h3 className="text-base font-medium text-gray-900">Display Options</h3>
+                    </div>
                     
-                    <div className="space-y-4">
+                    <div className="px-3 py-2 space-y-3">
                       {/* Link Expiration */}
                       <div>
-                        <div className="flex items-center mb-2">
-                          <span className="text-sm font-medium text-gray-700">Link Expiration</span>
-                          <InfoTooltip text="Set how many days payment links remain active before expiring" />
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center">
+                            <span className="text-sm font-medium text-gray-700">Link Expiration</span>
+                            <InfoTooltip text="Set how many days payment links remain active before expiring" />
+                          </div>
+                          <div className="flex items-center space-x-1.5">
+                            <input
+                              type="number"
+                              value={settings.linkExpirationDays}
+                              onChange={(e) => handleToggle('linkExpirationDays', parseInt(e.target.value) || 90)}
+                              min="1"
+                              max="365"
+                              className="w-16 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            />
+                            <span className="text-sm text-gray-500">days</span>
+                          </div>
                         </div>
-                        <div className="flex items-center">
-                          <input
-                            type="number"
-                            value={settings.linkExpirationDays}
-                            onChange={(e) => handleToggle('linkExpirationDays', parseInt(e.target.value) || 90)}
-                            min="1"
-                            max="365"
-                            className="block w-16 px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
-                          />
-                          <span className="ml-2 text-sm text-gray-500">days</span>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-0.5">Payment links will automatically expire after this period</p>
+                        <p className="text-xs text-gray-500">Payment links will automatically expire after this period</p>
                       </div>
 
                       {/* Invoice Details Visibility */}
@@ -1098,4 +1097,4 @@ const PaymentLinksWYSIWYGEditor = () => {
   );
 };
 
-export default PaymentLinksWYSIWYGEditor;
+export default PaymentLinksPrototype;
