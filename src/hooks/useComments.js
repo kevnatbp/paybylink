@@ -10,6 +10,8 @@ export const useSupabaseComments = (prototypeId) => {
   const fetchComments = async () => {
     try {
       setLoading(true);
+      console.log('Fetching comments for prototype:', prototypeId); // Debug log
+      
       const { data, error } = await supabase
         .from('comments')
         .select('id, text, author, tab, prototype_id, created_at')
@@ -21,6 +23,7 @@ export const useSupabaseComments = (prototypeId) => {
         throw error;
       }
       
+      console.log('Fetched comments:', data); // Debug log
       setComments(data || []);
     } catch (err) {
       console.error('Error fetching comments:', err);
@@ -62,7 +65,7 @@ export const useSupabaseComments = (prototypeId) => {
         throw new Error('No data returned from insert');
       }
 
-      // Update local state with the new comment
+      console.log('Added comment:', data); // Debug log
       setComments(prev => [data, ...prev]);
       return data;
     } catch (err) {
@@ -85,7 +88,6 @@ export const useSupabaseComments = (prototypeId) => {
         throw error;
       }
 
-      // Update local state by removing the deleted comment
       setComments(prev => prev.filter(comment => comment.id !== commentId));
     } catch (err) {
       console.error('Error deleting comment:', err);
@@ -96,6 +98,7 @@ export const useSupabaseComments = (prototypeId) => {
 
   // Initial fetch of comments
   useEffect(() => {
+    console.log('useEffect triggered for prototype:', prototypeId); // Debug log
     fetchComments();
   }, [prototypeId]);
 

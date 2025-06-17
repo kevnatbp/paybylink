@@ -243,7 +243,14 @@ const PaymentLinksPrototype = () => {
   };
 
   // Filter comments for current tab
-  const currentTabComments = comments.filter(comment => comment.tab === activeTab);
+  const currentTabComments = comments.filter(comment => {
+    console.log('Filtering comment:', comment); // Debug log
+    return comment.tab === activeTab;
+  });
+
+  console.log('Current tab:', activeTab); // Debug log
+  console.log('All comments:', comments); // Debug log
+  console.log('Filtered comments:', currentTabComments); // Debug log
 
   const ToggleSwitch = ({ enabled, onChange, disabled = false }) => (
     <button
@@ -281,27 +288,28 @@ const PaymentLinksPrototype = () => {
     <button
       onClick={() => onClick(id)}
       className={`
-        w-full flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-colors
+        flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-colors
         ${isActive 
           ? 'bg-blue-600 text-white' 
           : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
         }
+        w-full md:w-auto
       `}
     >
       <Icon className="h-4 w-4 mr-2" />
-      {label}
+      <span className="hidden sm:inline">{label}</span>
     </button>
   );
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-gray-100">
       {/* Main Layout */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar */}
-        <div className="w-72 bg-white border-r border-gray-200 flex-shrink-0 flex flex-col">
-          {/* Navigation */}
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+        {/* Left Sidebar - Collapsible on mobile */}
+        <div className="w-full md:w-72 bg-white border-b md:border-r border-gray-200 flex-shrink-0 flex flex-col">
+          {/* Navigation - Horizontal on mobile, vertical on desktop */}
           <div className="p-3 border-b border-gray-200">
-            <nav className="space-y-1">
+            <nav className="flex md:flex-col space-x-2 md:space-x-0 md:space-y-1">
               <SidebarNavItem
                 id="preview"
                 icon={Eye}
@@ -330,7 +338,7 @@ const PaymentLinksPrototype = () => {
           <div className="p-3 border-b border-gray-200 bg-gray-50">
             {!userName && !isEditingName ? (
               <div className="text-center">
-                <p className="text-xs text-gray-600 mb-2">Set your name to start commenting</p>
+                <p className="text-xs text-gray-600 mb-2">Set your name to add comments</p>
                 <button
                   onClick={handleStartEditingName}
                   className="px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
@@ -402,7 +410,7 @@ const PaymentLinksPrototype = () => {
             </div>
 
             {/* Add Comment Form */}
-            {userName && (
+            {userName ? (
               <div className="px-3 py-2 bg-white border-t border-gray-100">
                 <div className="space-y-4">
                   {commentsError && (
@@ -436,6 +444,18 @@ const PaymentLinksPrototype = () => {
                   </form>
                 </div>
               </div>
+            ) : (
+              <div className="px-3 py-2 bg-white border-t border-gray-100">
+                <div className="text-center">
+                  <p className="text-xs text-gray-600 mb-2">Set your name to add comments</p>
+                  <button
+                    onClick={handleStartEditingName}
+                    className="px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
+                  >
+                    Set Name
+                  </button>
+                </div>
+              </div>
             )}
           </div>
 
@@ -448,27 +468,23 @@ const PaymentLinksPrototype = () => {
                 </div>
               ) : commentsError ? (
                 <div className="text-center py-4 text-red-400">
-                  <p className="text-xs">Error loading comments</p>
-                </div>
-              ) : !userName ? (
-                <div className="text-center py-4 text-gray-400">
-                  <p className="text-xs">Set your name above to start commenting</p>
+                  <p className="text-xs">Error loading comments: {commentsError}</p>
                 </div>
               ) : currentTabComments.length === 0 ? (
                 <div className="text-center py-4 text-gray-400">
-                  <p className="text-xs">No comments yet</p>
+                  <p className="text-xs">No comments yet for {activeTab} tab</p>
                   <p className="text-xs mt-1">Be the first to comment!</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {currentTabComments.map((comment) => (
                     <div key={comment.id} className="bg-gray-50 p-3 rounded-md">
-                      <div className="flex justify-between items-start">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
                         <div>
                           <span className="font-medium text-sm">{comment.author}</span>
-                          <p className="text-sm text-gray-600 mt-1">{comment.text}</p>
+                          <p className="text-sm text-gray-600 mt-1 break-words">{comment.text}</p>
                         </div>
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-gray-500 whitespace-nowrap">
                           {new Date(comment.created_at).toLocaleString()}
                         </span>
                       </div>
@@ -910,7 +926,7 @@ const PaymentLinksPrototype = () => {
 
               {activeTab === 'settings' && (
                 // Settings Mode
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-7xl mx-auto">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-7xl mx-auto">
                   
                   {/* Auto-Generate Payment Links */}
                   <div className="bg-white rounded-lg border border-gray-200">
