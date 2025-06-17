@@ -4,8 +4,15 @@ import { Eye, Settings, Download, Plus, MessageSquare, Send, User } from 'lucide
 const PaymentLinksPrototype = () => {
   const [activeTab, setActiveTab] = useState('preview');
   const [newComment, setNewComment] = useState('');
-  const [comments, setComments] = useState([]);
-  const [userName, setUserName] = useState('');
+  const [comments, setComments] = useState(() => {
+    // Initialize comments from localStorage
+    const savedComments = localStorage.getItem('paymentLinksComments');
+    return savedComments ? JSON.parse(savedComments) : [];
+  });
+  const [userName, setUserName] = useState(() => {
+    // Initialize userName from localStorage
+    return localStorage.getItem('paymentLinksUserName') || '';
+  });
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempUserName, setTempUserName] = useState('');
   const [adHocForm, setAdHocForm] = useState({
@@ -62,6 +69,18 @@ const PaymentLinksPrototype = () => {
     merchantEmail: 'billing@acmesoftware.com',
     merchantPhone: '(555) 123-4567'
   };
+
+  // Save comments to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('paymentLinksComments', JSON.stringify(comments));
+  }, [comments]);
+
+  // Save userName to localStorage whenever it changes
+  useEffect(() => {
+    if (userName) {
+      localStorage.setItem('paymentLinksUserName', userName);
+    }
+  }, [userName]);
 
   const handleToggle = (key, value) => {
     setSettings(prev => ({
@@ -166,13 +185,12 @@ const PaymentLinksPrototype = () => {
     }));
   };
 
-  // Fixed: Now uses the actual userName instead of hardcoded 'User'
   const handleAddComment = () => {
     if (newComment.trim() && userName.trim()) {
       const comment = {
         id: Date.now(),
-        text: newComment,
-        author: userName, // Now uses the actual user name!
+        text: newComment.trim(),
+        author: userName,
         timestamp: new Date().toLocaleString(),
         tab: activeTab
       };
