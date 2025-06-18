@@ -458,18 +458,35 @@ const PaymentLinksPrototype = () => {
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => handleStartEditingComment(comment)}
-                          className="p-1 hover:bg-slate-200 rounded-full transition-colors"
-                        >
-                          <Pencil className="w-4 h-4 text-slate-500" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteComment(comment.id)}
-                          className="p-1 hover:bg-slate-200 rounded-full transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4 text-slate-500" />
-                        </button>
+                        {editingCommentId === comment.id ? (
+                          <>
+                            <button
+                              onClick={() => handleSaveEditedComment(comment.id)}
+                              className="text-xs text-slate-600 hover:text-slate-900"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => handleCancelEditComment()}
+                              className="text-xs text-slate-600 hover:text-slate-900"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => handleDeleteComment(comment.id)}
+                              className="text-xs text-red-600 hover:text-red-900"
+                            >
+                              Delete
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => handleStartEditingComment(comment)}
+                            className="text-xs text-slate-600 hover:text-slate-900"
+                          >
+                            Edit
+                          </button>
+                        )}
                       </div>
                     </div>
                     {editingCommentId === comment.id ? (
