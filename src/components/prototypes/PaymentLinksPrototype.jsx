@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, Settings, Download, Plus, MessageSquare, Send, User, Edit2, Trash2, Receipt, DollarSign, CreditCard, FileText, Wallet, Calendar, Pencil } from 'lucide-react';
 import { useSupabaseComments } from '../../hooks/useComments';
+import { useParams } from 'react-router-dom';
 
 const PaymentLinksPrototype = () => {
+  const { prototypeId } = useParams();
   const [activeTab, setActiveTab] = useState(() => {
     return localStorage.getItem('paymentLinksActiveTab') || 'preview';
   });
@@ -45,6 +47,11 @@ const PaymentLinksPrototype = () => {
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editingCommentText, setEditingCommentText] = useState('');
 
+  // Ensure payment amount is set to invoice amount on mount
+  useEffect(() => {
+    setPaymentAmount('125.00');
+  }, []);
+
   // Use the Supabase comments hook
   const { 
     comments, 
@@ -53,7 +60,7 @@ const PaymentLinksPrototype = () => {
     addComment, 
     deleteComment,
     updateComment 
-  } = useSupabaseComments('payment-links');
+  } = useSupabaseComments(prototypeId || 'payment-links');
 
   // Save userName to localStorage whenever it changes
   useEffect(() => {
@@ -175,28 +182,17 @@ const PaymentLinksPrototype = () => {
 
   const handleAddComment = async (e) => {
     e.preventDefault();
-    setCommentError(null);
-
-    if (!commentText.trim()) {
-      setCommentError('Please enter a comment');
-      return;
-    }
-
-    if (!userName.trim()) {
-      setCommentError('Please enter your name');
-      return;
-    }
+    if (!newComment.trim() || !userName) return;
 
     try {
       await addComment({
-        text: commentText,
+        text: newComment,
         author: userName,
         tab: activeTab
       });
-      setCommentText('');
-    } catch (err) {
-      console.error('Error adding comment:', err);
-      setCommentError(err.message || 'Failed to add comment');
+      setNewComment(''); // Clear the input after successful submission
+    } catch (error) {
+      console.error('Error adding comment:', error);
     }
   };
 
@@ -205,24 +201,33 @@ const PaymentLinksPrototype = () => {
     setEditingCommentText(comment.text);
   };
 
-  const handleSaveEditedComment = async (commentId) => {
+  const handleSaveEditedComment = async (e) => {
+    e.preventDefault();
+    if (!editingCommentId || !editingCommentText.trim()) return;
+
     try {
-      await updateComment(commentId, {
-        text: editingCommentText,
-        author: userName,
-        tab: activeTab
+      await updateComment(editingCommentId, {
+        text: editingCommentText
       });
       setEditingCommentId(null);
       setEditingCommentText('');
-    } catch (err) {
-      console.error('Error updating comment:', err);
-      setCommentError(err.message || 'Failed to update comment');
+    } catch (error) {
+      console.error('Error updating comment:', error);
     }
   };
 
   const handleCancelEditComment = () => {
     setEditingCommentId(null);
     setEditingCommentText('');
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    try {
+      await deleteComment(commentId);
+      // The comments will be automatically updated through the useEffect
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+    }
   };
 
   const handleClearName = () => {
@@ -411,13 +416,32 @@ const PaymentLinksPrototype = () => {
           </div>
 
           {/* Comments Section */}
-          <div className="bg-white rounded-lg shadow-sm border border-slate-200">
+          <div className="bg-white rounded-lg shadow-sm border border-slate-200 flex flex-col h-[calc(100vh-200px)]">
             <div className="p-4 border-b border-slate-200">
               <h3 className="text-lg font-medium text-slate-900">Comments</h3>
             </div>
-            <div className="p-4">
-              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
-                {comments.map((comment) => (
+            <div className="p-4 border-b border-slate-200">
+              <form onSubmit={handleAddComment}>
+                <textarea
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="Add a comment..."
+                  className="w-full p-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  rows={2}
+                />
+                <div className="mt-2 flex justify-end">
+                  <button
+                    type="submit"
+                    className="px-3 py-1.5 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                  >
+                    Add Comment
+                  </button>
+                </div>
+              </form>
+            </div>
+            <div className="flex-1 overflow-hidden flex flex-col">
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {currentTabComments.map((comment) => (
                   <div key={comment.id} className="bg-slate-50 rounded-lg p-4">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center space-x-2">
@@ -481,23 +505,6 @@ const PaymentLinksPrototype = () => {
                   </div>
                 ))}
               </div>
-              <form onSubmit={handleAddComment} className="mt-4">
-                <textarea
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  placeholder="Add a comment..."
-                  className="w-full p-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  rows={3}
-                />
-                <div className="mt-2 flex justify-end">
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-                  >
-                    Add Comment
-                  </button>
-                </div>
-              </form>
             </div>
           </div>
         </div>
@@ -511,159 +518,157 @@ const PaymentLinksPrototype = () => {
                 <div className="bg-white rounded-xl shadow-xl border border-slate-200">
                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 p-6">
                     {/* Payment Form - Left Side */}
-                    <div className="order-2 xl:order-1 bg-slate-50 rounded-xl border border-slate-200">
-                      <div className="px-5 py-4 border-b border-slate-200 bg-white rounded-t-xl">
-                        <div className="flex items-center">
-                          <CreditCard className="h-5 w-5 text-slate-700 mr-3" strokeWidth={2} />
-                          <h2 className="text-lg font-semibold text-slate-900">Make a Payment</h2>
-                        </div>
-                      </div>
-                      
-                      <div className="p-5 bg-white rounded-b-xl">
-                        {/* Payment Amount */}
-                        <div className="mb-5">
-                          <label className="flex items-center text-sm font-medium text-slate-700 mb-2">
-                            <DollarSign className="h-4 w-4 mr-2" strokeWidth={2} />
-                            Payment Amount
-                          </label>
-                          <div className="flex items-center">
-                            <span className="text-sm text-slate-500 mr-3 font-medium">USD</span>
-                            <input
-                              type="number"
-                              value={paymentAmount}
-                              onChange={(e) => setPaymentAmount(e.target.value)}
-                              className="block w-32 px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-base font-semibold"
-                            />
-                          </div>
-                          {settings.allowPartialPayments && (
-                            <p className="text-xs text-slate-500 mt-1">
-                              Minimum: ${(parseFloat(invoice.amount) * settings.minimumPartialPayment / 100).toFixed(2)}
-                            </p>
-                          )}
-                          {settings.allowOverpayments && (
-                            <p className="text-xs text-slate-500 mt-1">
-                              Maximum: ${(parseFloat(invoice.amount) * settings.maximumOverpayment / 100).toFixed(2)}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Payment Method Selection */}
-                        <div className="mb-5">
-                          <h3 className="text-sm font-medium text-slate-700 mb-3">Payment Method</h3>
-                          <div className="flex space-x-4 mb-4">
-                            <label className="flex items-center">
-                              <input
-                                type="radio"
-                                name="paymentType"
-                                value="credit"
-                                checked={paymentType === 'credit'}
-                                onChange={(e) => setPaymentType(e.target.value)}
-                                className="h-4 w-4 text-slate-600"
-                              />
-                              <CreditCard className="h-4 w-4 ml-2 mr-1 text-slate-600" strokeWidth={2} />
-                              <span className="text-sm text-slate-700">Credit Card</span>
+                    <div className="space-y-6">
+                      {/* Payment Amount and Method */}
+                      <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                        <div className="flex items-start justify-between">
+                          {/* Payment Amount */}
+                          <div className="flex-1">
+                            <label className="flex items-center text-sm font-medium text-slate-700 mb-2">
+                              <DollarSign className="h-4 w-4 mr-2" strokeWidth={2} />
+                              Payment Amount
                             </label>
-                            <label className="flex items-center">
+                            <div className="flex items-center">
+                              <span className="text-sm text-slate-500 mr-3 font-medium">USD</span>
                               <input
-                                type="radio"
-                                name="paymentType"
-                                value="debit"
-                                checked={paymentType === 'debit'}
-                                onChange={(e) => setPaymentType(e.target.value)}
-                                className="h-4 w-4 text-slate-600"
+                                type="number"
+                                value={paymentAmount}
+                                onChange={(e) => setPaymentAmount(e.target.value)}
+                                className="block w-32 px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-base font-semibold"
                               />
-                              <Wallet className="h-4 w-4 ml-2 mr-1 text-slate-600" strokeWidth={2} />
-                              <span className="text-sm text-slate-700">Direct Debit</span>
-                            </label>
+                            </div>
+                            {settings.allowPartialPayments && (
+                              <p className="text-xs text-slate-500 mt-1">
+                                Minimum: ${(parseFloat(invoice.amount) * settings.minimumPartialPayment / 100).toFixed(2)}
+                              </p>
+                            )}
+                            {settings.allowOverpayments && (
+                              <p className="text-xs text-slate-500 mt-1">
+                                Maximum: ${(parseFloat(invoice.amount) * settings.maximumOverpayment / 100).toFixed(2)}
+                              </p>
+                            )}
                           </div>
 
-                          {/* Payment Form Fields */}
-                          <div className="border border-slate-200 rounded-xl p-4 bg-slate-50">
-                            <div className="grid grid-cols-1 gap-4">
-                              <div>
-                                <label className="block text-xs font-medium text-slate-700 mb-2">
-                                  {paymentType === 'credit' ? 'Credit Card Number' : 'Account Number'} <span className="text-red-500">*</span>
-                                </label>
+                          {/* Payment Method Selection */}
+                          <div className="flex-1 ml-8">
+                            <h3 className="text-sm font-medium text-slate-700 mb-3">Payment Method</h3>
+                            <div className="flex flex-col space-y-3">
+                              <label className="flex items-center">
                                 <input
-                                  type="text"
-                                  placeholder={paymentType === 'credit' ? '4111 1111 1111 1111' : 'Account Number'}
-                                  className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
+                                  type="radio"
+                                  name="paymentType"
+                                  value="credit"
+                                  checked={paymentType === 'credit'}
+                                  onChange={(e) => setPaymentType(e.target.value)}
+                                  className="h-4 w-4 text-slate-600"
                                 />
-                              </div>
-                              
-                              {paymentType === 'credit' ? (
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div>
-                                    <label className="block text-xs font-medium text-slate-700 mb-2">
-                                      Expiration Date <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                      type="text"
-                                      placeholder="MM/YYYY"
-                                      className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
-                                    />
-                                  </div>
-                                  
-                                  <div>
-                                    <label className="block text-xs font-medium text-slate-700 mb-2">
-                                      CVC <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                      type="text"
-                                      placeholder="000"
-                                      className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
-                                    />
-                                  </div>
-                                </div>
-                              ) : (
-                                <div>
-                                  <label className="block text-xs font-medium text-slate-700 mb-2">
-                                    Routing Number <span className="text-red-500">*</span>
-                                  </label>
-                                  <input
-                                    type="text"
-                                    placeholder="123456789"
-                                    className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
-                                  />
-                                </div>
-                              )}
-                              
-                              <div>
-                                <label className="block text-xs font-medium text-slate-700 mb-2">
-                                  Full Name <span className="text-red-500">*</span>
-                                </label>
+                                <CreditCard className="h-4 w-4 ml-2 mr-1 text-slate-600" strokeWidth={2} />
+                                <span className="text-sm text-slate-700">Credit Card</span>
+                              </label>
+                              <label className="flex items-center">
                                 <input
-                                  type="text"
-                                  placeholder="Full Name"
-                                  className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
+                                  type="radio"
+                                  name="paymentType"
+                                  value="debit"
+                                  checked={paymentType === 'debit'}
+                                  onChange={(e) => setPaymentType(e.target.value)}
+                                  className="h-4 w-4 text-slate-600"
                                 />
-                              </div>
-                              
-                              <div>
-                                <label className="block text-xs font-medium text-slate-700 mb-2">Email</label>
-                                <input
-                                  type="email"
-                                  placeholder="email@example.com"
-                                  className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
-                                />
-                                <p className="text-xs text-slate-500 mt-1">Optional - for payment confirmation</p>
-                              </div>
+                                <Wallet className="h-4 w-4 ml-2 mr-1 text-slate-600" strokeWidth={2} />
+                                <span className="text-sm text-slate-700">Direct Debit</span>
+                              </label>
                             </div>
                           </div>
                         </div>
-
-                        {/* Pay Button */}
-                        <button
-                          onClick={handlePayment}
-                          className="w-full bg-slate-800 text-white py-3 px-4 rounded-lg text-base font-semibold hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 transition-colors shadow-lg"
-                        >
-                          Pay ${paymentAmount}
-                        </button>
-                        
-                        <p className="text-xs text-slate-500 text-center mt-2">
-                          Your payment will be processed securely.
-                        </p>
                       </div>
+
+                      {/* Payment Form Fields */}
+                      <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                        <div className="border border-slate-200 rounded-xl p-4 bg-white">
+                          <div className="grid grid-cols-1 gap-4">
+                            <div>
+                              <label className="block text-xs font-medium text-slate-700 mb-2">
+                                {paymentType === 'credit' ? 'Credit Card Number' : 'Account Number'} <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                placeholder={paymentType === 'credit' ? '4111 1111 1111 1111' : 'Account Number'}
+                                className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
+                              />
+                            </div>
+                            
+                            {paymentType === 'credit' ? (
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <label className="block text-xs font-medium text-slate-700 mb-2">
+                                    Expiration Date <span className="text-red-500">*</span>
+                                  </label>
+                                  <input
+                                    type="text"
+                                    placeholder="MM/YYYY"
+                                    className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
+                                  />
+                                </div>
+                                
+                                <div>
+                                  <label className="block text-xs font-medium text-slate-700 mb-2">
+                                    CVC <span className="text-red-500">*</span>
+                                  </label>
+                                  <input
+                                    type="text"
+                                    placeholder="000"
+                                    className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              <div>
+                                <label className="block text-xs font-medium text-slate-700 mb-2">
+                                  Routing Number <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="123456789"
+                                  className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
+                                />
+                              </div>
+                            )}
+                            
+                            <div>
+                              <label className="block text-xs font-medium text-slate-700 mb-2">
+                                Full Name <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="Full Name"
+                                className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
+                              />
+                            </div>
+                            
+                            <div>
+                              <label className="block text-xs font-medium text-slate-700 mb-2">Email</label>
+                              <input
+                                type="email"
+                                placeholder="email@example.com"
+                                className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
+                              />
+                              <p className="text-xs text-slate-500 mt-1">Optional - for payment confirmation</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Pay Button */}
+                      <button
+                        onClick={handlePayment}
+                        className="w-full bg-slate-800 text-white py-3 px-4 rounded-lg text-base font-semibold hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 transition-colors shadow-lg"
+                      >
+                        Pay ${paymentAmount}
+                      </button>
+                      
+                      <p className="text-xs text-slate-500 text-center">
+                        Your payment will be processed securely.
+                      </p>
                     </div>
 
                     {/* Invoice Details - Right Side */}
