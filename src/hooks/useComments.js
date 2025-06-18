@@ -6,24 +6,16 @@ export const useSupabaseComments = (prototypeId) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Fetch comments
   const fetchComments = async () => {
     try {
       setLoading(true);
-      console.log('Fetching comments for prototype:', prototypeId); // Debug log
-      
       const { data, error } = await supabase
         .from('comments')
-        .select('id, text, author, tab, prototype_id, created_at')
+        .select('*')
         .eq('prototype_id', prototypeId)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Supabase error:', error);
-        throw error;
-      }
-      
-      console.log('Fetched comments:', data); // Debug log
+      if (error) throw error;
       setComments(data || []);
     } catch (err) {
       console.error('Error fetching comments:', err);
@@ -33,49 +25,52 @@ export const useSupabaseComments = (prototypeId) => {
     }
   };
 
-  // Add a new comment
   const addComment = async (comment) => {
     try {
-      // Validate required fields
       if (!comment.text || !comment.author || !comment.tab) {
-        throw new Error('Missing required fields for comment');
+        throw new Error('Missing required fields');
       }
-
-      const newComment = {
-        prototype_id: prototypeId,
-        text: comment.text.trim(),
-        author: comment.author.trim(),
-        tab: comment.tab
-      };
-
-      console.log('Adding comment:', newComment); // Debug log
 
       const { data, error } = await supabase
         .from('comments')
-        .insert([newComment])
-        .select('id, text, author, tab, prototype_id, created_at')
+        .insert([
+          {
+            ...comment,
+            prototype_id: prototypeId,
+          },
+        ])
+        .select()
         .single();
 
-      if (error) {
-        console.error('Supabase error:', error);
-        throw error;
-      }
-
-      if (!data) {
-        throw new Error('No data returned from insert');
-      }
-
-      console.log('Added comment:', data); // Debug log
-      setComments(prev => [data, ...prev]);
+      if (error) throw error;
+      setComments((prev) => [data, ...prev]);
       return data;
     } catch (err) {
       console.error('Error adding comment:', err);
-      setError(err.message);
       throw err;
     }
   };
 
-  // Delete a comment
+  const updateComment = async (commentId, updates) => {
+    try {
+      const { data, error } = await supabase
+        .from('comments')
+        .update(updates)
+        .eq('id', commentId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      setComments((prev) =>
+        prev.map((comment) => (comment.id === commentId ? data : comment))
+      );
+      return data;
+    } catch (err) {
+      console.error('Error updating comment:', err);
+      throw err;
+    }
+  };
+
   const deleteComment = async (commentId) => {
     try {
       const { error } = await supabase
@@ -83,22 +78,15 @@ export const useSupabaseComments = (prototypeId) => {
         .delete()
         .eq('id', commentId);
 
-      if (error) {
-        console.error('Supabase error:', error);
-        throw error;
-      }
-
-      setComments(prev => prev.filter(comment => comment.id !== commentId));
+      if (error) throw error;
+      setComments((prev) => prev.filter((comment) => comment.id !== commentId));
     } catch (err) {
       console.error('Error deleting comment:', err);
-      setError(err.message);
       throw err;
     }
   };
 
-  // Initial fetch of comments
   useEffect(() => {
-    console.log('useEffect triggered for prototype:', prototypeId); // Debug log
     fetchComments();
   }, [prototypeId]);
 
@@ -107,7 +95,8 @@ export const useSupabaseComments = (prototypeId) => {
     loading,
     error,
     addComment,
+    updateComment,
     deleteComment,
-    refreshComments: fetchComments
+    refreshComments: fetchComments,
   };
 };

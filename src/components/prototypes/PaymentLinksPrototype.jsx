@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Eye, Settings, Download, Plus, MessageSquare, Send, User } from 'lucide-react';
+import { Eye, Settings, Download, Plus, MessageSquare, Send, User, Edit2, Trash2, Receipt, DollarSign, CreditCard, FileText, Wallet, Calendar } from 'lucide-react';
 import { useSupabaseComments } from '../../hooks/useComments';
 
-
 const PaymentLinksPrototype = () => {
-  const [activeTab, setActiveTab] = useState('preview');
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('paymentLinksActiveTab') || 'preview';
+  });
   const [newComment, setNewComment] = useState('');
   const [userName, setUserName] = useState(() => {
     return localStorage.getItem('paymentLinksUserName') || '';
@@ -39,6 +40,27 @@ const PaymentLinksPrototype = () => {
 
   const [paymentAmount, setPaymentAmount] = useState('125.00');
   const [paymentType, setPaymentType] = useState('credit');
+  const [commentText, setCommentText] = useState('');
+  const [commentError, setCommentError] = useState(null);
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
+
+  // Use the Supabase comments hook
+  const { 
+    comments, 
+    loading: commentsLoading, 
+    error: commentsError, 
+    addComment, 
+    deleteComment,
+    updateComment 
+  } = useSupabaseComments('payment-links');
+
+  // Save userName to localStorage whenever it changes
+  useEffect(() => {
+    if (userName) {
+      localStorage.setItem('paymentLinksUserName', userName);
+    }
+  }, [userName]);
 
   // Sample data for ad-hoc creation
   const availableInvoices = [
@@ -66,24 +88,10 @@ const PaymentLinksPrototype = () => {
     merchantPhone: '(555) 123-4567'
   };
 
-  // Use the Supabase comments hook
-  const { 
-    comments, 
-    loading: commentsLoading, 
-    error: commentsError, 
-    addComment, 
-    deleteComment 
-  } = useSupabaseComments('payment-links');
-
-  const [commentText, setCommentText] = useState('');
-  const [commentError, setCommentError] = useState(null);
-
-  // Save userName to localStorage whenever it changes
-  useEffect(() => {
-    if (userName) {
-      localStorage.setItem('paymentLinksUserName', userName);
-    }
-  }, [userName]);
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    localStorage.setItem('paymentLinksActiveTab', tab);
+  };
 
   const handleToggle = (key, value) => {
     setSettings(prev => ({
@@ -165,29 +173,6 @@ const PaymentLinksPrototype = () => {
       .map(([key]) => key);
   };
 
-  const handleLogoUpload = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setSettings(prev => ({
-          ...prev,
-          customLogo: file,
-          logoPreview: e.target.result
-        }));
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const removeLogo = () => {
-    setSettings(prev => ({
-      ...prev,
-      customLogo: null,
-      logoPreview: null
-    }));
-  };
-
   const handleAddComment = async (e) => {
     e.preventDefault();
     setCommentError(null);
@@ -215,11 +200,36 @@ const PaymentLinksPrototype = () => {
     }
   };
 
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleAddComment(e);
+  const handleStartEditingComment = (comment) => {
+    setEditingCommentId(comment.id);
+    setEditingCommentText(comment.text);
+  };
+
+  const handleSaveEditedComment = async (commentId) => {
+    try {
+      await updateComment(commentId, {
+        text: editingCommentText,
+        author: userName,
+        tab: activeTab
+      });
+      setEditingCommentId(null);
+      setEditingCommentText('');
+    } catch (err) {
+      console.error('Error updating comment:', err);
+      setCommentError(err.message || 'Failed to update comment');
     }
+  };
+
+  const handleCancelEditComment = () => {
+    setEditingCommentId(null);
+    setEditingCommentText('');
+  };
+
+  const handleClearName = () => {
+    setUserName('');
+    setIsEditingName(false);
+    setTempUserName('');
+    localStorage.removeItem('paymentLinksUserName');
   };
 
   // Helper function to get user initials for avatar
@@ -235,22 +245,15 @@ const PaymentLinksPrototype = () => {
   // Helper function to generate avatar color based on name
   const getAvatarColor = (name) => {
     const colors = [
-      'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 
-      'bg-indigo-500', 'bg-red-500', 'bg-yellow-500', 'bg-teal-500'
+      'bg-slate-700', 'bg-gray-700', 'bg-zinc-700', 'bg-neutral-700', 
+      'bg-stone-700', 'bg-red-700', 'bg-orange-700', 'bg-amber-700'
     ];
     const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     return colors[hash % colors.length];
   };
 
   // Filter comments for current tab
-  const currentTabComments = comments.filter(comment => {
-    console.log('Filtering comment:', comment); // Debug log
-    return comment.tab === activeTab;
-  });
-
-  console.log('Current tab:', activeTab); // Debug log
-  console.log('All comments:', comments); // Debug log
-  console.log('Filtered comments:', currentTabComments); // Debug log
+  const currentTabComments = comments.filter(comment => comment.tab === activeTab);
 
   const ToggleSwitch = ({ enabled, onChange, disabled = false }) => (
     <button
@@ -258,13 +261,13 @@ const PaymentLinksPrototype = () => {
       disabled={disabled}
       className={`
         relative inline-flex h-5 w-10 items-center rounded-full transition-colors
-        ${enabled ? 'bg-blue-600' : 'bg-gray-200'}
+        ${enabled ? 'bg-slate-700' : 'bg-gray-300'}
         ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
       `}
     >
       <span
         className={`
-          inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform
+          inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform shadow-sm
           ${enabled ? 'translate-x-5' : 'translate-x-1'}
         `}
       />
@@ -273,12 +276,12 @@ const PaymentLinksPrototype = () => {
 
   const InfoTooltip = ({ text }) => (
     <div className="group relative inline-block ml-1">
-      <svg className="h-3.5 w-3.5 text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="h-3.5 w-3.5 text-slate-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <circle cx="12" cy="12" r="10"/>
         <path d="m9,9 0,0a3,3 0 1,1 6,0c0,2 -3,3 -3,3"/>
         <path d="m12,17 .01,0"/>
       </svg>
-      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-lg">
         {text}
       </div>
     </div>
@@ -288,86 +291,94 @@ const PaymentLinksPrototype = () => {
     <button
       onClick={() => onClick(id)}
       className={`
-        flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-colors
+        flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200
         ${isActive 
-          ? 'bg-blue-600 text-white' 
-          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+          ? 'bg-slate-800 text-white shadow-lg' 
+          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'
         }
         w-full md:w-auto
       `}
     >
-      <Icon className="h-4 w-4 mr-2" />
+      <Icon className="h-4 w-4 mr-3" strokeWidth={2} />
       <span className="hidden sm:inline">{label}</span>
     </button>
   );
 
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', {
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-gray-100">
+    <div className="h-screen flex flex-col overflow-hidden bg-slate-50">
       {/* Main Layout */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {/* Left Sidebar - Collapsible on mobile */}
-        <div className="w-full md:w-72 bg-white border-b md:border-r border-gray-200 flex-shrink-0 flex flex-col">
+        <div className="w-full md:w-80 bg-white border-b md:border-r border-slate-200 flex-shrink-0 flex flex-col shadow-sm">
           {/* Navigation - Horizontal on mobile, vertical on desktop */}
-          <div className="p-3 border-b border-gray-200">
-            <nav className="flex md:flex-col space-x-2 md:space-x-0 md:space-y-1">
+          <div className="p-5 border-b border-slate-200">
+            <nav className="flex md:flex-col space-x-2 md:space-x-0 md:space-y-3">
               <SidebarNavItem
                 id="preview"
-                icon={Eye}
                 label="Preview"
+                icon={Eye}
                 isActive={activeTab === 'preview'}
-                onClick={setActiveTab}
+                onClick={handleTabChange}
               />
               <SidebarNavItem
                 id="adhoc"
+                label="Ad-hoc Creation"
                 icon={Plus}
-                label="Create Link"
                 isActive={activeTab === 'adhoc'}
-                onClick={setActiveTab}
+                onClick={handleTabChange}
               />
               <SidebarNavItem
                 id="settings"
-                icon={Settings}
                 label="Settings"
+                icon={Settings}
                 isActive={activeTab === 'settings'}
-                onClick={setActiveTab}
+                onClick={handleTabChange}
               />
             </nav>
           </div>
 
           {/* User Profile Section */}
-          <div className="p-3 border-b border-gray-200 bg-gray-50">
+          <div className="p-5 border-b border-slate-200 bg-slate-50">
             {!userName && !isEditingName ? (
               <div className="text-center">
-                <p className="text-xs text-gray-600 mb-2">Set your name to add comments</p>
+                <p className="text-xs text-slate-600 mb-3">Set your name to add comments</p>
                 <button
                   onClick={handleStartEditingName}
-                  className="px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
+                  className="px-4 py-2 text-xs font-medium text-white bg-slate-700 rounded-lg hover:bg-slate-800 transition-colors"
                 >
                   Set Name
                 </button>
               </div>
             ) : isEditingName ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <input
                   type="text"
                   value={tempUserName}
                   onChange={(e) => setTempUserName(e.target.value)}
                   onKeyDown={handleNameKeyPress}
                   placeholder="Enter your name"
-                  className="block w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  className="block w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
                   autoFocus
                 />
                 <div className="flex space-x-2">
                   <button
                     onClick={handleSaveName}
                     disabled={!tempUserName.trim()}
-                    className="flex-1 px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 px-3 py-2 text-xs font-medium text-white bg-slate-700 rounded-lg hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     Save
                   </button>
                   <button
                     onClick={handleCancelEditName}
-                    className="flex-1 px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
+                    className="flex-1 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
                   >
                     Cancel
                   </button>
@@ -376,559 +387,600 @@ const PaymentLinksPrototype = () => {
             ) : (
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
-                  <div className={`h-6 w-6 rounded-full flex items-center justify-center mr-2 text-white text-xs font-medium ${getAvatarColor(userName)}`}>
+                  <div className={`h-8 w-8 rounded-full flex items-center justify-center mr-3 text-white text-xs font-medium ${getAvatarColor(userName)} shadow-sm`}>
                     {getUserInitials(userName)}
                   </div>
-                  <span className="text-sm font-medium text-gray-900">{userName}</span>
+                  <span className="text-sm font-medium text-slate-900">{userName}</span>
                 </div>
-                <button
-                  onClick={handleStartEditingName}
-                  className="text-xs text-blue-600 hover:text-blue-700"
-                >
-                  Edit
-                </button>
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={handleStartEditingName}
+                    className="text-xs text-slate-600 hover:text-slate-800 transition-colors"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={handleClearName}
+                    className="text-xs text-red-600 hover:text-red-700 transition-colors"
+                  >
+                    Clear
+                  </button>
+                </div>
               </div>
             )}
           </div>
 
           {/* Comments Section */}
-          <div className="border-b border-gray-200">
+          <div className="flex flex-col flex-1 min-h-0">
             {/* Comments Header */}
-            <div className="px-3 py-2 bg-gray-50">
-              <div className="flex items-center justify-between text-xs font-medium text-gray-600">
+            <div className="px-5 py-4 bg-slate-50 border-b border-slate-200">
+              <div className="flex items-center justify-between text-xs font-medium text-slate-600">
                 <div className="flex items-center">
-                  <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+                  <MessageSquare className="h-4 w-4 mr-2" strokeWidth={2} />
                   <span className="uppercase tracking-wide">Comments</span>
                 </div>
-                <span className="bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded-full text-xs">
+                <span className="bg-slate-200 text-slate-700 px-2 py-1 rounded-full text-xs font-medium">
                   {currentTabComments.length}
                 </span>
               </div>
-              <div className="text-xs text-gray-500 mt-0.5">
+              <div className="text-xs text-slate-500 mt-1">
                 {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Tab
               </div>
             </div>
 
             {/* Add Comment Form */}
             {userName ? (
-              <div className="px-3 py-2 bg-white border-t border-gray-100">
-                <div className="space-y-4">
-                  {commentsError && (
-                    <div className="text-red-500 text-sm">
-                      Error loading comments: {commentsError}
-                    </div>
-                  )}
-                  
-                  {commentError && (
-                    <div className="text-red-500 text-sm">
-                      {commentError}
-                    </div>
-                  )}
-
-                  <form onSubmit={handleAddComment} className="space-y-3">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={commentText}
-                        onChange={(e) => setCommentText(e.target.value)}
-                        placeholder="Add a comment..."
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
-                      />
-                      <button
-                        type="submit"
-                        className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
-                      >
-                        Add
-                      </button>
-                    </div>
-                  </form>
-                </div>
+              <div className="px-5 py-4 bg-white border-b border-slate-200">
+                <form onSubmit={handleAddComment} className="space-y-3">
+                  <div className="flex gap-2">
+                    <textarea
+                      value={commentText}
+                      onChange={(e) => setCommentText(e.target.value)}
+                      placeholder="Add a comment..."
+                      className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
+                    />
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm hover:bg-slate-800 transition-colors"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </form>
               </div>
             ) : (
-              <div className="px-3 py-2 bg-white border-t border-gray-100">
+              <div className="px-5 py-4 bg-white border-b border-slate-200">
                 <div className="text-center">
-                  <p className="text-xs text-gray-600">Please set your name in the profile section above to add comments</p>
+                  <p className="text-xs text-slate-600">Please set your name in the profile section above to add comments</p>
                 </div>
               </div>
             )}
-          </div>
 
-          {/* Comments List */}
-          <div className="flex-1 overflow-y-auto px-3 py-2">
-            <div className="space-y-2">
-              {commentsLoading ? (
-                <div className="text-center py-4 text-gray-400">
-                  <p className="text-xs">Loading comments...</p>
-                </div>
-              ) : commentsError ? (
-                <div className="text-center py-4 text-red-400">
-                  <p className="text-xs">Error loading comments: {commentsError}</p>
-                </div>
-              ) : currentTabComments.length === 0 ? (
-                <div className="text-center py-4 text-gray-400">
-                  <p className="text-xs">No comments yet for {activeTab} tab</p>
-                  <p className="text-xs mt-1">Be the first to comment!</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {currentTabComments.map((comment) => (
-                    <div key={comment.id} className="bg-gray-50 p-3 rounded-md">
-                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
-                        <div className="flex-1 min-w-0 w-full">
-                          <div className="flex items-center justify-between mb-1">
-                            <div className="flex items-center min-w-0">
-                              <div className={`h-6 w-6 rounded-full flex items-center justify-center mr-2 text-white text-xs font-medium flex-shrink-0 ${getAvatarColor(comment.author)}`}>
-                                {getUserInitials(comment.author)}
-                              </div>
-                              <span className="font-medium text-sm truncate">{comment.author}</span>
+            {/* Comments List */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-5 space-y-4">
+                {commentsLoading ? (
+                  <div className="text-center py-8 text-slate-400">
+                    <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" strokeWidth={1.5} />
+                    <p className="text-sm">Loading comments...</p>
+                  </div>
+                ) : commentsError ? (
+                  <div className="text-center py-8 text-red-400">
+                    <p className="text-sm">Error loading comments: {commentsError}</p>
+                  </div>
+                ) : currentTabComments.length === 0 ? (
+                  <div className="text-center py-8 text-slate-400">
+                    <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" strokeWidth={1.5} />
+                    <p className="text-sm">No comments yet for {activeTab} tab</p>
+                    <p className="text-xs mt-1">Be the first to comment!</p>
+                  </div>
+                ) : (
+                  currentTabComments
+                    .sort((a, b) => b.id - a.id)
+                    .map(comment => (
+                      <div key={comment.id} className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center">
+                            <div className={`h-7 w-7 rounded-full flex items-center justify-center mr-3 text-white text-xs font-medium ${getAvatarColor(comment.author)} shadow-sm`}>
+                              {getUserInitials(comment.author)}
                             </div>
-                            <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0 ml-2">
-                              {new Date(comment.created_at).toLocaleString(undefined, {
-                                month: 'short',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </span>
+                            <span className="text-sm font-medium text-slate-900">{comment.author}</span>
                           </div>
-                          <div className="pl-8 pr-2">
-                            <p className="text-sm text-gray-600 break-words">{comment.text}</p>
+                          <div className="flex items-center space-x-3">
+                            <span className="text-xs text-slate-500">
+                              {formatDate(comment.created_at)}
+                            </span>
+                            <button
+                              onClick={() => handleStartEditingComment(comment)}
+                              className="text-slate-400 hover:text-slate-600 transition-colors"
+                            >
+                              <Edit2 className="h-4 w-4" strokeWidth={2} />
+                            </button>
                           </div>
                         </div>
+                        
+                        {editingCommentId === comment.id ? (
+                          <div className="space-y-3">
+                            <textarea
+                              value={editingCommentText}
+                              onChange={(e) => setEditingCommentText(e.target.value)}
+                              className="block w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 resize-none"
+                              rows={2}
+                            />
+                            <div className="flex justify-between items-center">
+                              <button
+                                onClick={() => deleteComment(comment.id)}
+                                className="px-3 py-1.5 text-xs font-medium text-red-600 hover:text-red-700 transition-colors flex items-center"
+                              >
+                                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                                Delete
+                              </button>
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={handleCancelEditComment}
+                                  className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  onClick={() => handleSaveEditedComment(comment.id)}
+                                  disabled={!editingCommentText.trim()}
+                                  className="px-3 py-1.5 text-xs font-medium text-white bg-slate-700 rounded-lg hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                  Save
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-slate-700">{comment.text}</p>
+                        )}
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))
+                )}
+              </div>
             </div>
           </div>
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto">
-            <div className="p-4">
+        <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="max-w-7xl mx-auto">
               {activeTab === 'preview' && (
                 // Preview Mode
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="bg-white rounded-lg shadow-lg max-w-6xl mx-auto">
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 p-4">
-                      {/* Payment Form - Left Side */}
-                      <div className="order-2 xl:order-1 bg-gray-50 rounded-lg border border-gray-200">
-                        <div className="px-4 py-3 border-b border-gray-200 bg-white rounded-t-lg">
-                          <h2 className="text-base font-semibold text-gray-900">Make a Payment</h2>
+                <div className="bg-white rounded-xl shadow-xl border border-slate-200">
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 p-6">
+                    {/* Payment Form - Left Side */}
+                    <div className="order-2 xl:order-1 bg-slate-50 rounded-xl border border-slate-200">
+                      <div className="px-5 py-4 border-b border-slate-200 bg-white rounded-t-xl">
+                        <div className="flex items-center">
+                          <CreditCard className="h-5 w-5 text-slate-700 mr-3" strokeWidth={2} />
+                          <h2 className="text-lg font-semibold text-slate-900">Make a Payment</h2>
                         </div>
-                        
-                        <div className="p-4 bg-white rounded-b-lg">
-                          {/* Payment Amount */}
-                          <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Payment Amount</label>
-                            <div className="flex items-center">
-                              <span className="text-sm text-gray-500 mr-2">USD</span>
+                      </div>
+                      
+                      <div className="p-5 bg-white rounded-b-xl">
+                        {/* Payment Amount */}
+                        <div className="mb-5">
+                          <label className="flex items-center text-sm font-medium text-slate-700 mb-2">
+                            <DollarSign className="h-4 w-4 mr-2" strokeWidth={2} />
+                            Payment Amount
+                          </label>
+                          <div className="flex items-center">
+                            <span className="text-sm text-slate-500 mr-3 font-medium">USD</span>
+                            <input
+                              type="number"
+                              value={paymentAmount}
+                              onChange={(e) => setPaymentAmount(e.target.value)}
+                              className="block w-32 px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-base font-semibold"
+                            />
+                          </div>
+                          {settings.allowPartialPayments && (
+                            <p className="text-xs text-slate-500 mt-1">
+                              Minimum: ${(parseFloat(invoice.amount) * settings.minimumPartialPayment / 100).toFixed(2)}
+                            </p>
+                          )}
+                          {settings.allowOverpayments && (
+                            <p className="text-xs text-slate-500 mt-1">
+                              Maximum: ${(parseFloat(invoice.amount) * settings.maximumOverpayment / 100).toFixed(2)}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Payment Method Selection */}
+                        <div className="mb-5">
+                          <h3 className="text-sm font-medium text-slate-700 mb-3">Payment Method</h3>
+                          <div className="flex space-x-4 mb-4">
+                            <label className="flex items-center">
                               <input
-                                type="number"
-                                value={paymentAmount}
-                                onChange={(e) => setPaymentAmount(e.target.value)}
-                                className="block w-32 px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-base font-semibold"
+                                type="radio"
+                                name="paymentType"
+                                value="credit"
+                                checked={paymentType === 'credit'}
+                                onChange={(e) => setPaymentType(e.target.value)}
+                                className="h-4 w-4 text-slate-600"
                               />
-                            </div>
-                            {settings.allowPartialPayments && (
-                              <p className="text-xs text-gray-500 mt-0.5">
-                                Minimum: ${(parseFloat(invoice.amount) * settings.minimumPartialPayment / 100).toFixed(2)}
-                              </p>
-                            )}
-                            {settings.allowOverpayments && (
-                              <p className="text-xs text-gray-500 mt-0.5">
-                                Maximum: ${(parseFloat(invoice.amount) * settings.maximumOverpayment / 100).toFixed(2)}
-                              </p>
-                            )}
+                              <CreditCard className="h-4 w-4 ml-2 mr-1 text-slate-600" strokeWidth={2} />
+                              <span className="text-sm text-slate-700">Credit Card</span>
+                            </label>
+                            <label className="flex items-center">
+                              <input
+                                type="radio"
+                                name="paymentType"
+                                value="debit"
+                                checked={paymentType === 'debit'}
+                                onChange={(e) => setPaymentType(e.target.value)}
+                                className="h-4 w-4 text-slate-600"
+                              />
+                              <Wallet className="h-4 w-4 ml-2 mr-1 text-slate-600" strokeWidth={2} />
+                              <span className="text-sm text-slate-700">Direct Debit</span>
+                            </label>
                           </div>
 
-                          {/* Payment Method Selection */}
-                          <div className="mb-4">
-                            <h3 className="text-sm font-medium text-gray-700 mb-2">Payment Method</h3>
-                            <div className="flex space-x-4 mb-3">
-                              <label className="flex items-center">
+                          {/* Payment Form Fields */}
+                          <div className="border border-slate-200 rounded-xl p-4 bg-slate-50">
+                            <div className="grid grid-cols-1 gap-4">
+                              <div>
+                                <label className="block text-xs font-medium text-slate-700 mb-2">
+                                  {paymentType === 'credit' ? 'Credit Card Number' : 'Account Number'} <span className="text-red-500">*</span>
+                                </label>
                                 <input
-                                  type="radio"
-                                  name="paymentType"
-                                  value="credit"
-                                  checked={paymentType === 'credit'}
-                                  onChange={(e) => setPaymentType(e.target.value)}
-                                  className="h-3.5 w-3.5 text-blue-600"
+                                  type="text"
+                                  placeholder={paymentType === 'credit' ? '4111 1111 1111 1111' : 'Account Number'}
+                                  className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
                                 />
-                                <span className="ml-1.5 text-sm text-gray-700">Credit Card</span>
-                              </label>
-                              <label className="flex items-center">
-                                <input
-                                  type="radio"
-                                  name="paymentType"
-                                  value="debit"
-                                  checked={paymentType === 'debit'}
-                                  onChange={(e) => setPaymentType(e.target.value)}
-                                  className="h-3.5 w-3.5 text-blue-600"
-                                />
-                                <span className="ml-1.5 text-sm text-gray-700">Direct Debit</span>
-                              </label>
-                            </div>
-
-                            {/* Payment Form Fields */}
-                            <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                              <div className="grid grid-cols-1 gap-3">
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                                    {paymentType === 'credit' ? 'Credit Card Number' : 'Account Number'} <span className="text-red-500">*</span>
-                                  </label>
-                                  <input
-                                    type="text"
-                                    placeholder={paymentType === 'credit' ? '4111 1111 1111 1111' : 'Account Number'}
-                                    className="block w-full px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                  />
-                                </div>
-                                
-                                {paymentType === 'credit' ? (
-                                  <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                                        Expiration Date <span className="text-red-500">*</span>
-                                      </label>
-                                      <input
-                                        type="text"
-                                        placeholder="MM/YYYY"
-                                        className="block w-full px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                      />
-                                    </div>
-                                    
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                                        CVC <span className="text-red-500">*</span>
-                                      </label>
-                                      <input
-                                        type="text"
-                                        placeholder="000"
-                                        className="block w-full px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                      />
-                                    </div>
-                                  </div>
-                                ) : (
+                              </div>
+                              
+                              {paymentType === 'credit' ? (
+                                <div className="grid grid-cols-2 gap-4">
                                   <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Routing Number <span className="text-red-500">*</span>
+                                    <label className="block text-xs font-medium text-slate-700 mb-2">
+                                      Expiration Date <span className="text-red-500">*</span>
                                     </label>
                                     <input
                                       type="text"
-                                      placeholder="123456789"
-                                      className="block w-full px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                      placeholder="MM/YYYY"
+                                      className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
                                     />
                                   </div>
-                                )}
-                                
+                                  
+                                  <div>
+                                    <label className="block text-xs font-medium text-slate-700 mb-2">
+                                      CVC <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                      type="text"
+                                      placeholder="000"
+                                      className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
+                                    />
+                                  </div>
+                                </div>
+                              ) : (
                                 <div>
-                                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                                    Full Name <span className="text-red-500">*</span>
+                                  <label className="block text-xs font-medium text-slate-700 mb-2">
+                                    Routing Number <span className="text-red-500">*</span>
                                   </label>
                                   <input
                                     type="text"
-                                    placeholder="Full Name"
-                                    className="block w-full px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                    placeholder="123456789"
+                                    className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
                                   />
-                                </div>
-                                
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
-                                  <input
-                                    type="email"
-                                    placeholder="email@example.com"
-                                    className="block w-full px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                  />
-                                  <p className="text-xs text-gray-500 mt-0.5">Optional - for payment confirmation</p>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Pay Button */}
-                          <button
-                            onClick={handlePayment}
-                            className="w-full bg-blue-600 text-white py-3 px-4 rounded-md text-base font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-                          >
-                            Pay ${paymentAmount}
-                          </button>
-                          
-                          <p className="text-xs text-gray-500 text-center mt-1.5">
-                            Your payment will be processed securely.
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Invoice Details - Right Side */}
-                      {settings.showInvoiceDetails && (
-                        <div className="order-1 xl:order-2 bg-white rounded-lg border border-gray-200 p-4">
-                          <div className="space-y-4">
-                            {/* Invoice Details */}
-                            <div>
-                              <h3 className="text-base font-semibold text-gray-900 mb-3">Invoice Details</h3>
-                              <div className="space-y-2">
-                                <div className="flex justify-between">
-                                  <span className="text-sm text-gray-600">Invoice Number:</span>
-                                  <span className="text-sm font-medium text-gray-900">{invoice.id}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-sm text-gray-600">Invoice Date:</span>
-                                  <span className="text-sm font-medium text-gray-900">{invoice.date}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-sm text-gray-600">Due Date:</span>
-                                  <span className="text-sm font-medium text-gray-900">{invoice.dueDate}</span>
-                                </div>
-                                <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-                                  <span className="text-sm font-semibold text-gray-900">Total Amount Due:</span>
-                                  <span className="text-xl font-bold text-gray-900">${invoice.amount}</span>
-                                </div>
-                              </div>
-                              
-                              {/* Invoice Actions */}
-                              {settings.enablePdfOptions && (
-                                <div className="flex space-x-2 mt-3">
-                                  <button
-                                    onClick={handlePreviewInvoice}
-                                    className="flex items-center px-2.5 py-1.5 text-xs text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
-                                  >
-                                    <Eye className="h-3.5 w-3.5 mr-1.5" />
-                                    Preview
-                                  </button>
-                                  <button
-                                    onClick={handleDownloadInvoice}
-                                    className="flex items-center px-2.5 py-1.5 text-xs text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
-                                  >
-                                    <Download className="h-3.5 w-3.5 mr-1.5" />
-                                    Download PDF
-                                  </button>
                                 </div>
                               )}
+                              
+                              <div>
+                                <label className="block text-xs font-medium text-slate-700 mb-2">
+                                  Full Name <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="Full Name"
+                                  className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
+                                />
+                              </div>
+                              
+                              <div>
+                                <label className="block text-xs font-medium text-slate-700 mb-2">Email</label>
+                                <input
+                                  type="email"
+                                  placeholder="email@example.com"
+                                  className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
+                                />
+                                <p className="text-xs text-slate-500 mt-1">Optional - for payment confirmation</p>
+                              </div>
                             </div>
+                          </div>
+                        </div>
 
-                            {/* Invoice Description */}
-                            <div>
-                              <h4 className="text-sm font-medium text-gray-900 mb-1.5">Description</h4>
-                              <p className="text-sm text-gray-600 bg-gray-50 rounded-lg p-2.5">{invoice.description}</p>
+                        {/* Pay Button */}
+                        <button
+                          onClick={handlePayment}
+                          className="w-full bg-slate-800 text-white py-3 px-4 rounded-lg text-base font-semibold hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 transition-colors shadow-lg"
+                        >
+                          Pay ${paymentAmount}
+                        </button>
+                        
+                        <p className="text-xs text-slate-500 text-center mt-2">
+                          Your payment will be processed securely.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Invoice Details - Right Side */}
+                    {settings.showInvoiceDetails && (
+                      <div className="order-1 xl:order-2 bg-white rounded-xl border border-slate-200 p-5">
+                        <div className="space-y-5">
+                          {/* Invoice Details */}
+                          <div>
+                            <div className="flex items-center mb-4">
+                              <Receipt className="h-5 w-5 text-slate-700 mr-3" strokeWidth={2} />
+                              <h3 className="text-lg font-semibold text-slate-900">Invoice Details</h3>
                             </div>
+                            <div className="space-y-3">
+                              <div className="flex justify-between">
+                                <span className="text-sm text-slate-600">Invoice Number:</span>
+                                <span className="text-sm font-medium text-slate-900">{invoice.id}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-sm text-slate-600">Invoice Date:</span>
+                                <span className="text-sm font-medium text-slate-900">{invoice.date}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-sm text-slate-600">Due Date:</span>
+                                <span className="text-sm font-medium text-slate-900">{invoice.dueDate}</span>
+                              </div>
+                              <div className="flex justify-between items-center pt-3 border-t border-slate-200">
+                                <span className="text-sm font-semibold text-slate-900">Total Amount Due:</span>
+                                <span className="text-xl font-bold text-slate-900">${invoice.amount}</span>
+                              </div>
+                            </div>
+                            
+                            {/* Invoice Actions */}
+                            {settings.enablePdfOptions && (
+                              <div className="flex space-x-3 mt-4">
+                                <button
+                                  onClick={handlePreviewInvoice}
+                                  className="flex items-center px-3 py-2 text-xs text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                                >
+                                  <Eye className="h-4 w-4 mr-2" strokeWidth={2} />
+                                  Preview
+                                </button>
+                                <button
+                                  onClick={handleDownloadInvoice}
+                                  className="flex items-center px-3 py-2 text-xs text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                                >
+                                  <Download className="h-4 w-4 mr-2" strokeWidth={2} />
+                                  Download PDF
+                                </button>
+                              </div>
+                            )}
+                          </div>
 
-                            {/* Merchant Information */}
-                            <div>
-                              <h3 className="text-base font-semibold text-gray-900 mb-2">Merchant Information</h3>
-                              <div className="bg-gray-50 rounded-lg p-3">
-                                <div className="space-y-1.5">
-                                  <div>
-                                    <span className="text-sm font-medium text-gray-900">{invoice.merchantName}</span>
-                                  </div>
-                                  <div>
-                                    <span className="text-xs text-gray-600">Email: </span>
-                                    <a href={`mailto:${invoice.merchantEmail}`} className="text-xs text-blue-600 hover:text-blue-700">
-                                      {invoice.merchantEmail}
-                                    </a>
-                                  </div>
-                                  <div>
-                                    <span className="text-xs text-gray-600">Phone: </span>
-                                    <a href={`tel:${invoice.merchantPhone}`} className="text-xs text-blue-600 hover:text-blue-700">
-                                      {invoice.merchantPhone}
-                                    </a>
-                                  </div>
+                          {/* Invoice Description */}
+                          <div>
+                            <h4 className="text-sm font-medium text-slate-900 mb-2 flex items-center">
+                              <FileText className="h-4 w-4 mr-2 text-slate-600" strokeWidth={2} />
+                              Description
+                            </h4>
+                            <p className="text-sm text-slate-600 bg-slate-50 rounded-lg p-3">{invoice.description}</p>
+                          </div>
+
+                          {/* Merchant Information */}
+                          <div>
+                            <h3 className="text-lg font-semibold text-slate-900 mb-3 flex items-center">
+                              <User className="h-5 w-5 mr-3 text-slate-700" strokeWidth={2} />
+                              Merchant Information
+                            </h3>
+                            <div className="bg-slate-50 rounded-lg p-4">
+                              <div className="space-y-2">
+                                <div>
+                                  <span className="text-sm font-medium text-slate-900">{invoice.merchantName}</span>
+                                </div>
+                                <div>
+                                  <span className="text-xs text-slate-600">Email: </span>
+                                  <a href={`mailto:${invoice.merchantEmail}`} className="text-xs text-slate-700 hover:text-slate-900 font-medium">
+                                    {invoice.merchantEmail}
+                                  </a>
+                                </div>
+                                <div>
+                                  <span className="text-xs text-slate-600">Phone: </span>
+                                  <a href={`tel:${invoice.merchantPhone}`} className="text-xs text-slate-700 hover:text-slate-900 font-medium">
+                                    {invoice.merchantPhone}
+                                  </a>
                                 </div>
                               </div>
                             </div>
                           </div>
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
 
               {activeTab === 'adhoc' && (
                 // Ad-hoc Link Creation Mode
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="bg-white rounded-lg shadow-lg max-w-6xl mx-auto">
-                    <div className="p-4">
-                      <div className="flex items-center justify-between mb-4">
-                        <div>
-                          <h2 className="text-lg font-semibold text-gray-900">Create Ad-Hoc Payment Link</h2>
-                          <p className="text-sm text-gray-600 mt-0.5">Generate a custom payment link</p>
+                <div className="bg-white rounded-xl shadow-xl border border-slate-200">
+                  <div className="p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <div className="flex items-center mb-2">
+                          <Plus className="h-6 w-6 text-slate-700 mr-3" strokeWidth={2} />
+                          <h2 className="text-xl font-semibold text-slate-900">Create Ad-Hoc Payment Link</h2>
                         </div>
+                        <p className="text-sm text-slate-600">Generate a custom payment link</p>
                       </div>
+                    </div>
 
-                      {/* Attribution Type Selection */}
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Attribution Type</label>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          {getEnabledAttributionTypes().includes('invoice') && (
-                            <label className={`cursor-pointer rounded-lg border-2 p-3 ${
-                              adHocForm.attributionType === 'invoice' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
-                            }`}>
-                              <input
-                                type="radio"
-                                name="attributionType"
-                                value="invoice"
-                                checked={adHocForm.attributionType === 'invoice'}
-                                onChange={(e) => handleAdHocFormChange('attributionType', e.target.value)}
-                                className="sr-only"
-                              />
-                              <div className="text-center">
-                                <svg className="mx-auto h-6 w-6 text-gray-400 mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                                <h3 className="text-sm font-medium text-gray-900">Invoice</h3>
-                                <p className="text-xs text-gray-500 mt-0.5">Link to specific invoice</p>
-                              </div>
-                            </label>
-                          )}
-
-                          {getEnabledAttributionTypes().includes('openAmount') && (
-                            <label className={`cursor-pointer rounded-lg border-2 p-3 ${
-                              adHocForm.attributionType === 'openAmount' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
-                            }`}>
-                              <input
-                                type="radio"
-                                name="attributionType"
-                                value="openAmount"
-                                checked={adHocForm.attributionType === 'openAmount'}
-                                onChange={(e) => handleAdHocFormChange('attributionType', e.target.value)}
-                                className="sr-only"
-                              />
-                              <div className="text-center">
-                                <svg className="mx-auto h-6 w-6 text-gray-400 mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                                </svg>
-                                <h3 className="text-sm font-medium text-gray-900">Open Amount</h3>
-                                <p className="text-xs text-gray-500 mt-0.5">Custom payment amount</p>
-                              </div>
-                            </label>
-                          )}
-
-                          {getEnabledAttributionTypes().includes('accountBalance') && (
-                            <label className={`cursor-pointer rounded-lg border-2 p-3 ${
-                              adHocForm.attributionType === 'accountBalance' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
-                            }`}>
-                              <input
-                                type="radio"
-                                name="attributionType"
-                                value="accountBalance"
-                                checked={adHocForm.attributionType === 'accountBalance'}
-                                onChange={(e) => handleAdHocFormChange('attributionType', e.target.value)}
-                                className="sr-only"
-                              />
-                              <div className="text-center">
-                                <svg className="mx-auto h-6 w-6 text-gray-400 mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                                </svg>
-                                <h3 className="text-sm font-medium text-gray-900">Account Balance</h3>
-                                <p className="text-xs text-gray-500 mt-0.5">Total account balance</p>
-                              </div>
-                            </label>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Dynamic Form Fields */}
-                      <div className="space-y-4">
-                        {adHocForm.attributionType === 'invoice' && (
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Select Invoice</label>
-                            <select
-                              value={adHocForm.selectedInvoice}
-                              onChange={(e) => handleAdHocFormChange('selectedInvoice', e.target.value)}
-                              className="block w-full px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
-                            >
-                              <option value="">Choose an invoice...</option>
-                              {availableInvoices.map(inv => (
-                                <option key={inv.id} value={inv.id}>
-                                  {inv.id} - {inv.customer} - ${inv.amount} ({inv.date})
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-
-                        {adHocForm.attributionType === 'openAmount' && (
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Payment Amount</label>
-                            <div className="flex items-center">
-                              <span className="text-sm text-gray-500 mr-2">USD</span>
-                              <input
-                                type="number"
-                                value={adHocForm.customAmount}
-                                onChange={(e) => handleAdHocFormChange('customAmount', e.target.value)}
-                                placeholder="0.00"
-                                min="0"
-                                step="0.01"
-                                className="block w-32 px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
-                              />
+                    {/* Attribution Type Selection */}
+                    <div className="mb-6">
+                      <label className="block text-sm font-medium text-slate-700 mb-3">Attribution Type</label>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {getEnabledAttributionTypes().includes('invoice') && (
+                          <label className={`cursor-pointer rounded-xl border-2 p-4 transition-all ${
+                            adHocForm.attributionType === 'invoice' ? 'border-slate-700 bg-slate-50' : 'border-slate-200 hover:border-slate-300'
+                          }`}>
+                            <input
+                              type="radio"
+                              name="attributionType"
+                              value="invoice"
+                              checked={adHocForm.attributionType === 'invoice'}
+                              onChange={(e) => handleAdHocFormChange('attributionType', e.target.value)}
+                              className="sr-only"
+                            />
+                            <div className="text-center">
+                              <Receipt className="mx-auto h-8 w-8 text-slate-600 mb-3" strokeWidth={2} />
+                              <h3 className="text-sm font-medium text-slate-900">Invoice</h3>
+                              <p className="text-xs text-slate-500 mt-1">Link to specific invoice</p>
                             </div>
-                          </div>
+                          </label>
                         )}
 
-                        {adHocForm.attributionType === 'accountBalance' && (
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Select Account</label>
-                            <select
-                              value={adHocForm.accountId}
-                              onChange={(e) => handleAdHocFormChange('accountId', e.target.value)}
-                              className="block w-full px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
-                            >
-                              <option value="">Choose an account...</option>
-                              {availableAccounts.map(acc => (
-                                <option key={acc.id} value={acc.id}>
-                                  {acc.name} - Current Balance: ${acc.balance}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
+                        {getEnabledAttributionTypes().includes('openAmount') && (
+                          <label className={`cursor-pointer rounded-xl border-2 p-4 transition-all ${
+                            adHocForm.attributionType === 'openAmount' ? 'border-slate-700 bg-slate-50' : 'border-slate-200 hover:border-slate-300'
+                          }`}>
+                            <input
+                              type="radio"
+                              name="attributionType"
+                              value="openAmount"
+                              checked={adHocForm.attributionType === 'openAmount'}
+                              onChange={(e) => handleAdHocFormChange('attributionType', e.target.value)}
+                              className="sr-only"
+                            />
+                            <div className="text-center">
+                              <DollarSign className="mx-auto h-8 w-8 text-slate-600 mb-3" strokeWidth={2} />
+                              <h3 className="text-sm font-medium text-slate-900">Open Amount</h3>
+                              <p className="text-xs text-slate-500 mt-1">Custom payment amount</p>
+                            </div>
+                          </label>
                         )}
 
-                        {/* Common Fields */}
+                        {getEnabledAttributionTypes().includes('accountBalance') && (
+                          <label className={`cursor-pointer rounded-xl border-2 p-4 transition-all ${
+                            adHocForm.attributionType === 'accountBalance' ? 'border-slate-700 bg-slate-50' : 'border-slate-200 hover:border-slate-300'
+                          }`}>
+                            <input
+                              type="radio"
+                              name="attributionType"
+                              value="accountBalance"
+                              checked={adHocForm.attributionType === 'accountBalance'}
+                              onChange={(e) => handleAdHocFormChange('attributionType', e.target.value)}
+                              className="sr-only"
+                            />
+                            <div className="text-center">
+                              <Wallet className="mx-auto h-8 w-8 text-slate-600 mb-3" strokeWidth={2} />
+                              <h3 className="text-sm font-medium text-slate-900">Account Balance</h3>
+                              <p className="text-xs text-slate-500 mt-1">Total account balance</p>
+                            </div>
+                          </label>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Dynamic Form Fields */}
+                    <div className="space-y-5">
+                      {adHocForm.attributionType === 'invoice' && (
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1.5">Description (Optional)</label>
-                          <textarea
-                            value={adHocForm.description}
-                            onChange={(e) => handleAdHocFormChange('description', e.target.value)}
-                            placeholder="Add a description for this payment link..."
-                            rows={2}
-                            className="block w-full px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
-                          />
+                          <label className="block text-sm font-medium text-slate-700 mb-2">Select Invoice</label>
+                          <select
+                            value={adHocForm.selectedInvoice}
+                            onChange={(e) => handleAdHocFormChange('selectedInvoice', e.target.value)}
+                            className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
+                          >
+                            <option value="">Choose an invoice...</option>
+                            {availableInvoices.map(inv => (
+                              <option key={inv.id} value={inv.id}>
+                                {inv.id} - {inv.customer} - ${inv.amount} ({inv.date})
+                              </option>
+                            ))}
+                          </select>
                         </div>
+                      )}
 
+                      {adHocForm.attributionType === 'openAmount' && (
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1.5">Link Expiration</label>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">Payment Amount</label>
                           <div className="flex items-center">
+                            <span className="text-sm text-slate-500 mr-3 font-medium">USD</span>
                             <input
                               type="number"
-                              value={adHocForm.expirationDays}
-                              onChange={(e) => handleAdHocFormChange('expirationDays', parseInt(e.target.value))}
-                              min="1"
-                              max="365"
-                              className="block w-16 px-2.5 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
+                              value={adHocForm.customAmount}
+                              onChange={(e) => handleAdHocFormChange('customAmount', e.target.value)}
+                              placeholder="0.00"
+                              min="0"
+                              step="0.01"
+                              className="block w-32 px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
                             />
-                            <span className="ml-2 text-sm text-gray-500">days</span>
                           </div>
-                          <p className="text-xs text-gray-500 mt-0.5">Payment link will expire after this many days</p>
                         </div>
+                      )}
+
+                      {adHocForm.attributionType === 'accountBalance' && (
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">Select Account</label>
+                          <select
+                            value={adHocForm.accountId}
+                            onChange={(e) => handleAdHocFormChange('accountId', e.target.value)}
+                            className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
+                          >
+                            <option value="">Choose an account...</option>
+                            {availableAccounts.map(acc => (
+                              <option key={acc.id} value={acc.id}>
+                                {acc.name} - Current Balance: ${acc.balance}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {/* Common Fields */}
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Description (Optional)</label>
+                        <textarea
+                          value={adHocForm.description}
+                          onChange={(e) => handleAdHocFormChange('description', e.target.value)}
+                          placeholder="Add a description for this payment link..."
+                          rows={3}
+                          className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
+                        />
                       </div>
 
-                      {/* Action Buttons */}
-                      <div className="flex justify-end space-x-2 mt-6 pt-4 border-t border-gray-200">
-                        <button
-                          onClick={() => setActiveTab('preview')}
-                          className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={handleCreateAdHocLink}
-                          className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
-                        >
-                          Create Payment Link
-                        </button>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center">
+                          <Calendar className="h-4 w-4 mr-2 text-slate-600" strokeWidth={2} />
+                          Link Expiration
+                        </label>
+                        <div className="flex items-center">
+                          <input
+                            type="number"
+                            value={adHocForm.expirationDays}
+                            onChange={(e) => handleAdHocFormChange('expirationDays', parseInt(e.target.value))}
+                            min="1"
+                            max="365"
+                            className="block w-20 px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
+                          />
+                          <span className="ml-3 text-sm text-slate-500">days</span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">Payment link will expire after this many days</p>
                       </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex justify-end space-x-3 mt-8 pt-5 border-t border-slate-200">
+                      <button
+                        onClick={() => setActiveTab('preview')}
+                        className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleCreateAdHocLink}
+                        className="px-4 py-2 text-sm font-medium text-white bg-slate-800 border border-transparent rounded-lg hover:bg-slate-900 transition-colors shadow-lg"
+                      >
+                        Create Payment Link
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -936,234 +988,232 @@ const PaymentLinksPrototype = () => {
 
               {activeTab === 'settings' && (
                 // Settings Mode
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="bg-white rounded-lg shadow-lg max-w-7xl mx-auto">
-                    <div className="p-4">
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        {/* Auto-Generate Payment Links */}
-                        <div className="bg-white rounded-lg border border-gray-200">
-                          <div className="px-3 py-3 border-b border-gray-200">
+                <div className="bg-white rounded-xl shadow-xl border border-slate-200">
+                  <div className="p-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Auto-Generate Payment Links */}
+                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+                        <div className="px-4 py-4 border-b border-slate-200">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <h3 className="text-base font-medium text-slate-900">Auto-Generate Payment Links</h3>
+                              <InfoTooltip text="Automatically create payment links for approved invoices" />
+                            </div>
+                            <ToggleSwitch 
+                              enabled={settings.autoGenerate}
+                              onChange={(value) => handleToggle('autoGenerate', value)}
+                            />
+                          </div>
+                          <p className="text-sm text-slate-600 mt-2">
+                            When enabled, a payment link will be generated for each approved invoice.
+                          </p>
+                        </div>
+                        
+                        {settings.autoGenerate && (
+                          <div className="px-4 py-3">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center">
-                                <h3 className="text-base font-medium text-gray-900">Auto-Generate Payment Links</h3>
-                                <InfoTooltip text="Automatically create payment links for approved invoices" />
+                                <span className="text-sm font-medium text-slate-700">Allow account-level disable</span>
+                                <InfoTooltip text="Individual accounts can override this setting" />
                               </div>
                               <ToggleSwitch 
-                                enabled={settings.autoGenerate}
-                                onChange={(value) => handleToggle('autoGenerate', value)}
+                                enabled={settings.accountLevelDisable}
+                                onChange={(value) => handleToggle('accountLevelDisable', value)}
                               />
                             </div>
-                            <p className="text-sm text-gray-600 mt-1">
-                              When enabled, a payment link will be generated for each approved invoice.
-                            </p>
+                            <p className="text-xs text-slate-500 mt-1">Default: Disabled</p>
                           </div>
-                          
-                          {settings.autoGenerate && (
-                            <div className="px-3 py-2">
+                        )}
+                      </div>
+
+                      {/* Ad-hoc Payment Links */}
+                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+                        <div className="px-4 py-4 border-b border-slate-200">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <h3 className="text-base font-medium text-slate-900">Ad-hoc Payment Links</h3>
+                              <InfoTooltip text="Allow manual creation of payment links for various purposes" />
+                            </div>
+                            <ToggleSwitch 
+                              enabled={settings.adHocEnabled}
+                              onChange={(value) => handleToggle('adHocEnabled', value)}
+                            />
+                          </div>
+                          <p className="text-sm text-slate-600 mt-2">
+                            When enabled, users can create payment links manually with configurable attribution.
+                          </p>
+                        </div>
+
+                        {settings.adHocEnabled && (
+                          <div className="px-4 py-3">
+                            <h4 className="text-sm font-medium text-slate-700 mb-3">Attribution Types</h4>
+                            <p className="text-xs text-slate-500 mb-3">Select which attribution types are available</p>
+                            
+                            <div className="space-y-3">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center">
-                                  <span className="text-sm font-medium text-gray-700">Allow account-level disable</span>
-                                  <InfoTooltip text="Individual accounts can override this setting" />
+                                  <span className="text-sm text-slate-700">Invoice</span>
+                                  <span className="ml-2 text-xs text-slate-500">(Default)</span>
                                 </div>
                                 <ToggleSwitch 
-                                  enabled={settings.accountLevelDisable}
-                                  onChange={(value) => handleToggle('accountLevelDisable', value)}
+                                  enabled={settings.attributionTypes.invoice}
+                                  onChange={(value) => handleAttributionChange('invoice', value)}
                                 />
                               </div>
-                              <p className="text-xs text-gray-500 mt-0.5">Default: Disabled</p>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Ad-hoc Payment Links */}
-                        <div className="bg-white rounded-lg border border-gray-200">
-                          <div className="px-3 py-3 border-b border-gray-200">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center">
-                                <h3 className="text-base font-medium text-gray-900">Ad-hoc Payment Links</h3>
-                                <InfoTooltip text="Allow manual creation of payment links for various purposes" />
-                              </div>
-                              <ToggleSwitch 
-                                enabled={settings.adHocEnabled}
-                                onChange={(value) => handleToggle('adHocEnabled', value)}
-                              />
-                            </div>
-                            <p className="text-sm text-gray-600 mt-1">
-                              When enabled, users can create payment links manually with configurable attribution.
-                            </p>
-                          </div>
-
-                          {settings.adHocEnabled && (
-                            <div className="px-3 py-2">
-                              <h4 className="text-sm font-medium text-gray-700 mb-2">Attribution Types</h4>
-                              <p className="text-xs text-gray-500 mb-2">Select which attribution types are available</p>
                               
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center">
-                                    <span className="text-sm text-gray-700">Invoice</span>
-                                    <span className="ml-1.5 text-xs text-gray-500">(Default)</span>
-                                  </div>
-                                  <ToggleSwitch 
-                                    enabled={settings.attributionTypes.invoice}
-                                    onChange={(value) => handleAttributionChange('invoice', value)}
-                                  />
-                                </div>
-                                
-                                <div className="flex items-center justify-between">
-                                  <span className="text-sm text-gray-700">Open Amount</span>
-                                  <ToggleSwitch 
-                                    enabled={settings.attributionTypes.openAmount}
-                                    onChange={(value) => handleAttributionChange('openAmount', value)}
-                                  />
-                                </div>
-                                
-                                <div className="flex items-center justify-between">
-                                  <span className="text-sm text-gray-700">Account Balance</span>
-                                  <ToggleSwitch 
-                                    enabled={settings.attributionTypes.accountBalance}
-                                    onChange={(value) => handleAttributionChange('accountBalance', value)}
-                                  />
-                                </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-slate-700">Open Amount</span>
+                                <ToggleSwitch 
+                                  enabled={settings.attributionTypes.openAmount}
+                                  onChange={(value) => handleAttributionChange('openAmount', value)}
+                                />
+                              </div>
+                              
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-slate-700">Account Balance</span>
+                                <ToggleSwitch 
+                                  enabled={settings.attributionTypes.accountBalance}
+                                  onChange={(value) => handleAttributionChange('accountBalance', value)}
+                                />
                               </div>
                             </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
+                      </div>
 
-                        {/* Payment Options */}
-                        <div className="bg-white rounded-lg border border-gray-200">
-                          <div className="px-3 py-3 border-b border-gray-200">
-                            <h3 className="text-base font-medium text-gray-900">Payment Options</h3>
+                      {/* Payment Options */}
+                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+                        <div className="px-4 py-4 border-b border-slate-200">
+                          <h3 className="text-base font-medium text-slate-900">Payment Options</h3>
+                        </div>
+                        
+                        <div className="px-4 py-3 space-y-4">
+                          {/* Partial Payments */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <span className="text-sm font-medium text-slate-700">Allow Partial Payments</span>
+                              <InfoTooltip text="Customers can pay less than the full amount due" />
+                            </div>
+                            <ToggleSwitch 
+                              enabled={settings.allowPartialPayments}
+                              onChange={(value) => handleToggle('allowPartialPayments', value)}
+                            />
                           </div>
                           
-                          <div className="px-3 py-2 space-y-3">
-                            {/* Partial Payments */}
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center">
-                                <span className="text-sm font-medium text-gray-700">Allow Partial Payments</span>
-                                <InfoTooltip text="Customers can pay less than the full amount due" />
-                              </div>
-                              <ToggleSwitch 
-                                enabled={settings.allowPartialPayments}
-                                onChange={(value) => handleToggle('allowPartialPayments', value)}
-                              />
-                            </div>
-                            
-                            {settings.allowPartialPayments && (
-                              <div className="ml-4 pl-3 border-l-2 border-gray-100">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center">
-                                    <span className="text-sm text-gray-700">Minimum partial payment</span>
-                                    <InfoTooltip text="Set the minimum percentage that customers can pay" />
-                                  </div>
-                                  <div className="flex items-center space-x-1.5">
-                                    <input
-                                      type="number"
-                                      min="1"
-                                      max="99"
-                                      value={settings.minimumPartialPayment}
-                                      onChange={(e) => handleToggle('minimumPartialPayment', parseInt(e.target.value))}
-                                      className="w-14 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    />
-                                    <span className="text-sm text-gray-500">%</span>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* Overpayments */}
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center">
-                                <span className="text-sm font-medium text-gray-700">Allow Overpayments</span>
-                                <InfoTooltip text="Customers can pay more than the amount due" />
-                              </div>
-                              <ToggleSwitch 
-                                enabled={settings.allowOverpayments}
-                                onChange={(value) => handleToggle('allowOverpayments', value)}
-                              />
-                            </div>
-                            
-                            {settings.allowOverpayments && (
-                              <div className="ml-4 pl-3 border-l-2 border-gray-100">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center">
-                                    <span className="text-sm text-gray-700">Maximum overpayment</span>
-                                    <InfoTooltip text="Set the maximum percentage customers can overpay" />
-                                  </div>
-                                  <div className="flex items-center space-x-1.5">
-                                    <input
-                                      type="number"
-                                      min="101"
-                                      max="500"
-                                      value={settings.maximumOverpayment}
-                                      onChange={(e) => handleToggle('maximumOverpayment', parseInt(e.target.value))}
-                                      className="w-14 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    />
-                                    <span className="text-sm text-gray-500">%</span>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Display Options */}
-                        <div className="bg-white rounded-lg border border-gray-200">
-                          <div className="px-3 py-3 border-b border-gray-200">
-                            <h3 className="text-base font-medium text-gray-900">Display Options</h3>
-                          </div>
-                          
-                          <div className="px-3 py-2 space-y-3">
-                            {/* Link Expiration */}
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
+                          {settings.allowPartialPayments && (
+                            <div className="ml-4 pl-4 border-l-2 border-slate-100">
+                              <div className="flex items-center justify-between">
                                 <div className="flex items-center">
-                                  <span className="text-sm font-medium text-gray-700">Link Expiration</span>
-                                  <InfoTooltip text="Set how many days payment links remain active before expiring" />
+                                  <span className="text-sm text-slate-700">Minimum partial payment</span>
+                                  <InfoTooltip text="Set the minimum percentage that customers can pay" />
                                 </div>
-                                <div className="flex items-center space-x-1.5">
+                                <div className="flex items-center space-x-2">
                                   <input
                                     type="number"
-                                    value={settings.linkExpirationDays}
-                                    onChange={(e) => handleToggle('linkExpirationDays', parseInt(e.target.value) || 90)}
                                     min="1"
-                                    max="365"
-                                    className="w-16 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    max="99"
+                                    value={settings.minimumPartialPayment}
+                                    onChange={(e) => handleToggle('minimumPartialPayment', parseInt(e.target.value))}
+                                    className="w-16 px-2 py-1 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
                                   />
-                                  <span className="text-sm text-gray-500">days</span>
+                                  <span className="text-sm text-slate-500">%</span>
                                 </div>
                               </div>
-                              <p className="text-xs text-gray-500">Payment links will automatically expire after this period</p>
                             </div>
-
-                            {/* Invoice Details Visibility */}
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center">
-                                <span className="text-sm font-medium text-gray-700">Show Invoice Details</span>
-                                <InfoTooltip text="Display invoice information section on payment link pages" />
-                              </div>
-                              <ToggleSwitch 
-                                enabled={settings.showInvoiceDetails}
-                                onChange={(value) => handleToggle('showInvoiceDetails', value)}
-                              />
+                          )}
+                          
+                          {/* Overpayments */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <span className="text-sm font-medium text-slate-700">Allow Overpayments</span>
+                              <InfoTooltip text="Customers can pay more than the amount due" />
                             </div>
-
-                            {/* PDF Options */}
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center">
-                                <span className="text-sm font-medium text-gray-700">Enable PDF Preview & Download</span>
-                                <InfoTooltip text="Allow customers to preview and download invoice PDFs" />
-                              </div>
-                              <ToggleSwitch 
-                                enabled={settings.enablePdfOptions}
-                                onChange={(value) => handleToggle('enablePdfOptions', value)}
-                                disabled={!settings.showInvoiceDetails}
-                              />
-                            </div>
-                            {!settings.showInvoiceDetails && (
-                              <p className="text-xs text-gray-500 ml-4">PDF options require invoice details to be shown</p>
-                            )}
+                            <ToggleSwitch 
+                              enabled={settings.allowOverpayments}
+                              onChange={(value) => handleToggle('allowOverpayments', value)}
+                            />
                           </div>
+                          
+                          {settings.allowOverpayments && (
+                            <div className="ml-4 pl-4 border-l-2 border-slate-100">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center">
+                                  <span className="text-sm text-slate-700">Maximum overpayment</span>
+                                  <InfoTooltip text="Set the maximum percentage customers can overpay" />
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <input
+                                    type="number"
+                                    min="101"
+                                    max="500"
+                                    value={settings.maximumOverpayment}
+                                    onChange={(e) => handleToggle('maximumOverpayment', parseInt(e.target.value))}
+                                    className="w-16 px-2 py-1 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
+                                  />
+                                  <span className="text-sm text-slate-500">%</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Display Options */}
+                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+                        <div className="px-4 py-4 border-b border-slate-200">
+                          <h3 className="text-base font-medium text-slate-900">Display Options</h3>
+                        </div>
+                        
+                        <div className="px-4 py-3 space-y-4">
+                          {/* Link Expiration */}
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center">
+                                <span className="text-sm font-medium text-slate-700">Link Expiration</span>
+                                <InfoTooltip text="Set how many days payment links remain active before expiring" />
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <input
+                                  type="number"
+                                  value={settings.linkExpirationDays}
+                                  onChange={(e) => handleToggle('linkExpirationDays', parseInt(e.target.value) || 90)}
+                                  min="1"
+                                  max="365"
+                                  className="w-20 px-2 py-1 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
+                                />
+                                <span className="text-sm text-slate-500">days</span>
+                              </div>
+                            </div>
+                            <p className="text-xs text-slate-500">Payment links will automatically expire after this period</p>
+                          </div>
+
+                          {/* Invoice Details Visibility */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <span className="text-sm font-medium text-slate-700">Show Invoice Details</span>
+                              <InfoTooltip text="Display invoice information section on payment link pages" />
+                            </div>
+                            <ToggleSwitch 
+                              enabled={settings.showInvoiceDetails}
+                              onChange={(value) => handleToggle('showInvoiceDetails', value)}
+                            />
+                          </div>
+
+                          {/* PDF Options */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <span className="text-sm font-medium text-slate-700">Enable PDF Preview & Download</span>
+                              <InfoTooltip text="Allow customers to preview and download invoice PDFs" />
+                            </div>
+                            <ToggleSwitch 
+                              enabled={settings.enablePdfOptions}
+                              onChange={(value) => handleToggle('enablePdfOptions', value)}
+                              disabled={!settings.showInvoiceDetails}
+                            />
+                          </div>
+                          {!settings.showInvoiceDetails && (
+                            <p className="text-xs text-slate-500 ml-4">PDF options require invoice details to be shown</p>
+                          )}
                         </div>
                       </div>
                     </div>
