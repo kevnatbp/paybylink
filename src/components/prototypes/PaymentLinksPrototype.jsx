@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Eye, Settings, Download, Plus, MessageSquare, Send, User, Edit2, Trash2, Receipt, DollarSign, CreditCard, FileText, Wallet, Calendar } from 'lucide-react';
+import { Eye, Settings, Download, Plus, MessageSquare, Send, User, Edit2, Trash2, Receipt, DollarSign, CreditCard, FileText, Wallet, Calendar, Pencil } from 'lucide-react';
 import { useSupabaseComments } from '../../hooks/useComments';
 
 const PaymentLinksPrototype = () => {
@@ -411,134 +411,93 @@ const PaymentLinksPrototype = () => {
           </div>
 
           {/* Comments Section */}
-          <div className="flex flex-col flex-1 min-h-0">
-            {/* Comments Header */}
-            <div className="px-5 py-4 bg-slate-50 border-b border-slate-200">
-              <div className="flex items-center justify-between text-xs font-medium text-slate-600">
-                <div className="flex items-center">
-                  <MessageSquare className="h-4 w-4 mr-2" strokeWidth={2} />
-                  <span className="uppercase tracking-wide">Comments</span>
-                </div>
-                <span className="bg-slate-200 text-slate-700 px-2 py-1 rounded-full text-xs font-medium">
-                  {currentTabComments.length}
-                </span>
-              </div>
-              <div className="text-xs text-slate-500 mt-1">
-                {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Tab
-              </div>
+          <div className="bg-white rounded-lg shadow-sm border border-slate-200">
+            <div className="p-4 border-b border-slate-200">
+              <h3 className="text-lg font-medium text-slate-900">Comments</h3>
             </div>
-
-            {/* Add Comment Form */}
-            {userName ? (
-              <div className="px-5 py-4 bg-white border-b border-slate-200">
-                <form onSubmit={handleAddComment} className="space-y-3">
-                  <div className="flex gap-2">
-                    <textarea
-                      value={commentText}
-                      onChange={(e) => setCommentText(e.target.value)}
-                      placeholder="Add a comment..."
-                      className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
-                    />
-                    <button
-                      type="submit"
-                      className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm hover:bg-slate-800 transition-colors"
-                    >
-                      Add
-                    </button>
-                  </div>
-                </form>
-              </div>
-            ) : (
-              <div className="px-5 py-4 bg-white border-b border-slate-200">
-                <div className="text-center">
-                  <p className="text-xs text-slate-600">Please set your name in the profile section above to add comments</p>
-                </div>
-              </div>
-            )}
-
-            {/* Comments List */}
-            <div className="flex-1 overflow-y-auto">
-              <div className="p-5 space-y-4">
-                {commentsLoading ? (
-                  <div className="text-center py-8 text-slate-400">
-                    <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" strokeWidth={1.5} />
-                    <p className="text-sm">Loading comments...</p>
-                  </div>
-                ) : commentsError ? (
-                  <div className="text-center py-8 text-red-400">
-                    <p className="text-sm">Error loading comments: {commentsError}</p>
-                  </div>
-                ) : currentTabComments.length === 0 ? (
-                  <div className="text-center py-8 text-slate-400">
-                    <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" strokeWidth={1.5} />
-                    <p className="text-sm">No comments yet for {activeTab} tab</p>
-                    <p className="text-xs mt-1">Be the first to comment!</p>
-                  </div>
-                ) : (
-                  currentTabComments
-                    .sort((a, b) => b.id - a.id)
-                    .map(comment => (
-                      <div key={comment.id} className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-center">
-                            <div className={`h-7 w-7 rounded-full flex items-center justify-center mr-3 text-white text-xs font-medium ${getAvatarColor(comment.author)} shadow-sm`}>
-                              {getUserInitials(comment.author)}
-                            </div>
-                            <span className="text-sm font-medium text-slate-900">{comment.author}</span>
-                          </div>
-                          <div className="flex items-center space-x-3">
-                            <span className="text-xs text-slate-500">
-                              {formatDate(comment.created_at)}
-                            </span>
-                            <button
-                              onClick={() => handleStartEditingComment(comment)}
-                              className="text-slate-400 hover:text-slate-600 transition-colors"
-                            >
-                              <Edit2 className="h-4 w-4" strokeWidth={2} />
-                            </button>
-                          </div>
+            <div className="p-4">
+              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                {comments.map((comment) => (
+                  <div key={comment.id} className="bg-slate-50 rounded-lg p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center">
+                          <span className="text-sm font-medium text-slate-600">
+                            {comment.author.charAt(0).toUpperCase()}
+                          </span>
                         </div>
-                        
-                        {editingCommentId === comment.id ? (
-                          <div className="space-y-3">
-                            <textarea
-                              value={editingCommentText}
-                              onChange={(e) => setEditingCommentText(e.target.value)}
-                              className="block w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 resize-none"
-                              rows={2}
-                            />
-                            <div className="flex justify-between items-center">
-                              <button
-                                onClick={() => deleteComment(comment.id)}
-                                className="px-3 py-1.5 text-xs font-medium text-red-600 hover:text-red-700 transition-colors flex items-center"
-                              >
-                                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                                Delete
-                              </button>
-                              <div className="flex space-x-2">
-                                <button
-                                  onClick={handleCancelEditComment}
-                                  className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
-                                >
-                                  Cancel
-                                </button>
-                                <button
-                                  onClick={() => handleSaveEditedComment(comment.id)}
-                                  disabled={!editingCommentText.trim()}
-                                  className="px-3 py-1.5 text-xs font-medium text-white bg-slate-700 rounded-lg hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                >
-                                  Save
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <p className="text-sm text-slate-700">{comment.text}</p>
-                        )}
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">{comment.author}</p>
+                          <p className="text-xs text-slate-500">
+                            {new Date(comment.created_at).toLocaleString()}
+                          </p>
+                        </div>
                       </div>
-                    ))
-                )}
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleStartEditingComment(comment)}
+                          className="p-1 hover:bg-slate-200 rounded-full transition-colors"
+                        >
+                          <Pencil className="w-4 h-4 text-slate-500" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteComment(comment.id)}
+                          className="p-1 hover:bg-slate-200 rounded-full transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4 text-slate-500" />
+                        </button>
+                      </div>
+                    </div>
+                    {editingCommentId === comment.id ? (
+                      <form
+                        onSubmit={handleSaveEditedComment}
+                        className="mt-2"
+                      >
+                        <textarea
+                          value={editingCommentText}
+                          onChange={(e) => setEditingCommentText(e.target.value)}
+                          className="w-full p-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          rows={3}
+                        />
+                        <div className="mt-2 flex justify-end space-x-2">
+                          <button
+                            type="button"
+                            onClick={handleCancelEditComment}
+                            className="px-3 py-1 text-sm text-slate-600 hover:text-slate-900"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            className="px-3 py-1 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                          >
+                            Save
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <p className="mt-2 text-sm text-slate-700">{comment.text}</p>
+                    )}
+                  </div>
+                ))}
               </div>
+              <form onSubmit={handleAddComment} className="mt-4">
+                <textarea
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="Add a comment..."
+                  className="w-full p-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  rows={3}
+                />
+                <div className="mt-2 flex justify-end">
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                  >
+                    Add Comment
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
