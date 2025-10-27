@@ -23,7 +23,10 @@ const PaymentLinksPrototype = () => {
     expirationDays: 90
   });
   const [settings, setSettings] = useState({
-    autoGenerate: true,
+    autoGenerate: {
+      enabled: true,
+      mode: 'closed_invoices' // 'closed_invoices' or 'all_accounts'
+    },
     accountLevelDisable: true,
     adHocEnabled: true,
     attributionTypes: {
@@ -37,7 +40,12 @@ const PaymentLinksPrototype = () => {
     enablePdfOptions: true,
     minimumPartialPayment: 25,
     maximumOverpayment: 150,
-    linkExpirationDays: 90
+    linkExpirationDays: 90,
+    appliedTo: {
+      type: 'all_accounts',
+      formula: "Account.tier = 'enterprise'",
+      priority: 1
+    }
   });
 
   const [paymentAmount, setPaymentAmount] = useState('125.00');
@@ -53,13 +61,13 @@ const PaymentLinksPrototype = () => {
   }, []);
 
   // Use the Supabase comments hook
-  const { 
-    comments, 
-    loading: commentsLoading, 
-    error: commentsError, 
-    addComment, 
+  const {
+    comments,
+    loading: commentsLoading,
+    error: commentsError,
+    addComment,
     deleteComment,
-    updateComment 
+    updateComment
   } = useSupabaseComments(prototypeId || 'payment-links');
 
   // Save userName to localStorage whenever it changes
@@ -68,6 +76,7 @@ const PaymentLinksPrototype = () => {
       localStorage.setItem('paymentLinksUserName', userName);
     }
   }, [userName]);
+
 
   // Sample data for ad-hoc creation
   const availableInvoices = [
@@ -104,6 +113,26 @@ const PaymentLinksPrototype = () => {
     setSettings(prev => ({
       ...prev,
       [key]: value
+    }));
+  };
+
+  const handleAutoGenerateChange = (field, value) => {
+    setSettings(prev => ({
+      ...prev,
+      autoGenerate: {
+        ...prev.autoGenerate,
+        [field]: value
+      }
+    }));
+  };
+
+  const handleAppliedToChange = (field, value) => {
+    setSettings(prev => ({
+      ...prev,
+      appliedTo: {
+        ...prev.appliedTo,
+        [field]: value
+      }
     }));
   };
 
@@ -345,6 +374,13 @@ const PaymentLinksPrototype = () => {
                 label="Settings"
                 icon={Settings}
                 isActive={activeTab === 'settings'}
+                onClick={handleTabChange}
+              />
+              <SidebarNavItem
+                id="profile"
+                label="Profile"
+                icon={User}
+                isActive={activeTab === 'profile'}
                 onClick={handleTabChange}
               />
             </nav>
@@ -968,233 +1004,182 @@ const PaymentLinksPrototype = () => {
               )}
 
               {activeTab === 'settings' && (
-                // Settings Mode
+                // Organization Link Settings Mode
                 <div className="bg-white rounded-xl shadow-xl border border-slate-200">
                   <div className="p-6">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      {/* Auto-Generate Payment Links */}
-                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-                        <div className="px-4 py-4 border-b border-slate-200">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                              <h3 className="text-base font-medium text-slate-900">Auto-Generate Payment Links</h3>
-                              <InfoTooltip text="Automatically create payment links for approved invoices" />
-                            </div>
-                            <ToggleSwitch 
-                              enabled={settings.autoGenerate}
-                              onChange={(value) => handleToggle('autoGenerate', value)}
-                            />
-                          </div>
-                          <p className="text-sm text-slate-600 mt-2">
-                            When enabled, a payment link will be generated for each approved invoice.
-                          </p>
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <div className="flex items-center mb-2">
+                          <Settings className="h-6 w-6 text-slate-700 mr-3" strokeWidth={2} />
+                          <h2 className="text-xl font-semibold text-slate-900">Organization Link Settings</h2>
                         </div>
-                        
-                        {settings.autoGenerate && (
-                          <div className="px-4 py-3">
+                        <p className="text-sm text-slate-600">Configure how payment links are created and managed</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      {/* Org Settings Panel - Left 2/3 */}
+                      <div className="lg:col-span-2">
+                        <div className="space-y-6">
+                          {/* Auto-Generate Payment Links */}
+                          <div className="space-y-4">
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center">
-                                <span className="text-sm font-medium text-slate-700">Allow account-level disable</span>
-                                <InfoTooltip text="Individual accounts can override this setting" />
+                              <div>
+                                <div className="flex items-center">
+                                  <h3 className="text-base font-medium text-slate-900">Auto-Generate Payment Links</h3>
+                                  <InfoTooltip text="Automatically create payment links for approved invoices" />
+                                </div>
+                                <p className="text-sm text-slate-600 mt-1">
+                                  When enabled, payment links will be automatically generated based on the selected criteria.
+                                </p>
                               </div>
-                              <ToggleSwitch 
-                                enabled={settings.accountLevelDisable}
-                                onChange={(value) => handleToggle('accountLevelDisable', value)}
+                              <ToggleSwitch
+                                enabled={settings.autoGenerate.enabled}
+                                onChange={(value) => handleAutoGenerateChange('enabled', value)}
                               />
                             </div>
-                            <p className="text-xs text-slate-500 mt-1">Default: Disabled</p>
-                          </div>
-                        )}
-                      </div>
 
-                      {/* Ad-hoc Payment Links */}
-                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-                        <div className="px-4 py-4 border-b border-slate-200">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                              <h3 className="text-base font-medium text-slate-900">Ad-hoc Payment Links</h3>
-                              <InfoTooltip text="Allow manual creation of payment links for various purposes" />
-                            </div>
-                            <ToggleSwitch 
-                              enabled={settings.adHocEnabled}
-                              onChange={(value) => handleToggle('adHocEnabled', value)}
-                            />
-                          </div>
-                          <p className="text-sm text-slate-600 mt-2">
-                            When enabled, users can create payment links manually with configurable attribution.
-                          </p>
-                        </div>
+                            {/* Generate payment links for */}
+                            {settings.autoGenerate.enabled && (
+                              <div className="ml-4 pl-4 border-l-2 border-slate-100 space-y-4">
+                                <div>
+                                  <div className="flex items-center mb-3">
+                                    <label className="text-sm font-medium text-slate-700">Generate payment links for:</label>
+                                    <InfoTooltip text="Choose when payment links should be automatically created" />
+                                  </div>
+                                  <div className="space-y-3">
+                                    <label className="flex items-start">
+                                      <input
+                                        type="radio"
+                                        name="autoGenerateMode"
+                                        value="closed_invoices"
+                                        checked={settings.autoGenerate.mode === 'closed_invoices'}
+                                        onChange={(e) => handleAutoGenerateChange('mode', e.target.value)}
+                                        className="h-4 w-4 text-slate-600 focus:ring-slate-500 border-slate-300 mt-0.5"
+                                      />
+                                      <div className="ml-3">
+                                        <span className="text-sm text-slate-700 font-medium">All closed invoices</span>
+                                        <p className="text-xs text-slate-500 mt-0.5">Payment links generated when invoices are marked as closed/final</p>
+                                      </div>
+                                    </label>
 
-                        {settings.adHocEnabled && (
-                          <div className="px-4 py-3">
-                            <h4 className="text-sm font-medium text-slate-700 mb-3">Attribution Types</h4>
-                            <p className="text-xs text-slate-500 mb-3">Select which attribution types are available</p>
-                            
-                            <div className="space-y-3">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center">
-                                  <span className="text-sm text-slate-700">Invoice</span>
-                                  <span className="ml-2 text-xs text-slate-500">(Default)</span>
+                                    <label className="flex items-start">
+                                      <input
+                                        type="radio"
+                                        name="autoGenerateMode"
+                                        value="all_accounts"
+                                        checked={settings.autoGenerate.mode === 'all_accounts'}
+                                        onChange={(e) => handleAutoGenerateChange('mode', e.target.value)}
+                                        className="h-4 w-4 text-slate-600 focus:ring-slate-500 border-slate-300 mt-0.5"
+                                      />
+                                      <div className="ml-3">
+                                        <span className="text-sm text-slate-700 font-medium">All accounts</span>
+                                        <p className="text-xs text-slate-500 mt-0.5">Payment links generated for all invoice activity across accounts</p>
+                                      </div>
+                                    </label>
+                                  </div>
                                 </div>
-                                <ToggleSwitch 
-                                  enabled={settings.attributionTypes.invoice}
-                                  onChange={(value) => handleAttributionChange('invoice', value)}
-                                />
-                              </div>
-                              
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm text-slate-700">Open Amount</span>
-                                <ToggleSwitch 
-                                  enabled={settings.attributionTypes.openAmount}
-                                  onChange={(value) => handleAttributionChange('openAmount', value)}
-                                />
-                              </div>
-                              
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm text-slate-700">Account Balance</span>
-                                <ToggleSwitch 
-                                  enabled={settings.attributionTypes.accountBalance}
-                                  onChange={(value) => handleAttributionChange('accountBalance', value)}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
 
-                      {/* Payment Options */}
-                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-                        <div className="px-4 py-4 border-b border-slate-200">
-                          <h3 className="text-base font-medium text-slate-900">Payment Options</h3>
-                        </div>
-                        
-                        <div className="px-4 py-3 space-y-4">
-                          {/* Partial Payments */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                              <span className="text-sm font-medium text-slate-700">Allow Partial Payments</span>
-                              <InfoTooltip text="Customers can pay less than the full amount due" />
-                            </div>
-                            <ToggleSwitch 
-                              enabled={settings.allowPartialPayments}
-                              onChange={(value) => handleToggle('allowPartialPayments', value)}
-                            />
-                          </div>
-                          
-                          {settings.allowPartialPayments && (
-                            <div className="ml-4 pl-4 border-l-2 border-slate-100">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center">
-                                  <span className="text-sm text-slate-700">Minimum partial payment</span>
-                                  <InfoTooltip text="Set the minimum percentage that customers can pay" />
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    max="99"
-                                    value={settings.minimumPartialPayment}
-                                    onChange={(e) => handleToggle('minimumPartialPayment', parseInt(e.target.value))}
-                                    className="w-16 px-2 py-1 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
+                                {/* Allow account-level disable */}
+                                <div className="flex items-center justify-between pt-2 border-t border-slate-200">
+                                  <div className="flex items-center">
+                                    <span className="text-sm font-medium text-slate-700">Allow account-level disable</span>
+                                    <InfoTooltip text="Individual accounts can override this setting" />
+                                  </div>
+                                  <ToggleSwitch
+                                    enabled={settings.accountLevelDisable}
+                                    onChange={(value) => handleToggle('accountLevelDisable', value)}
                                   />
-                                  <span className="text-sm text-slate-500">%</span>
                                 </div>
                               </div>
-                            </div>
-                          )}
-                          
-                          {/* Overpayments */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                              <span className="text-sm font-medium text-slate-700">Allow Overpayments</span>
-                              <InfoTooltip text="Customers can pay more than the amount due" />
-                            </div>
-                            <ToggleSwitch 
-                              enabled={settings.allowOverpayments}
-                              onChange={(value) => handleToggle('allowOverpayments', value)}
-                            />
+                            )}
                           </div>
-                          
-                          {settings.allowOverpayments && (
-                            <div className="ml-4 pl-4 border-l-2 border-slate-100">
-                              <div className="flex items-center justify-between">
+
+                          {/* Ad-hoc Payment Links */}
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                              <div>
                                 <div className="flex items-center">
-                                  <span className="text-sm text-slate-700">Maximum overpayment</span>
-                                  <InfoTooltip text="Set the maximum percentage customers can overpay" />
+                                  <h3 className="text-base font-medium text-slate-900">Ad-hoc Payment Links</h3>
+                                  <InfoTooltip text="Allow manual creation of payment links for various purposes" />
                                 </div>
-                                <div className="flex items-center space-x-2">
-                                  <input
-                                    type="number"
-                                    min="101"
-                                    max="500"
-                                    value={settings.maximumOverpayment}
-                                    onChange={(e) => handleToggle('maximumOverpayment', parseInt(e.target.value))}
-                                    className="w-16 px-2 py-1 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
-                                  />
-                                  <span className="text-sm text-slate-500">%</span>
+                                <p className="text-sm text-slate-600 mt-1">
+                                  When enabled, users can create payment links manually with configurable attribution.
+                                </p>
+                              </div>
+                              <ToggleSwitch
+                                enabled={settings.adHocEnabled}
+                                onChange={(value) => handleToggle('adHocEnabled', value)}
+                              />
+                            </div>
+
+                            {/* Attribution Types */}
+                            {settings.adHocEnabled && (
+                              <div className="ml-4 pl-4 border-l-2 border-slate-100 space-y-4">
+                                <div>
+                                  <h4 className="text-sm font-medium text-slate-700 mb-3">Attribution Types</h4>
+                                  <p className="text-xs text-slate-500 mb-3">Select which attribution types are available</p>
+
+                                  <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center">
+                                        <span className="text-sm text-slate-700">Invoice</span>
+                                        <span className="ml-2 text-xs text-slate-500">(Default)</span>
+                                      </div>
+                                      <ToggleSwitch
+                                        enabled={settings.attributionTypes.invoice}
+                                        onChange={(value) => handleAttributionChange('invoice', value)}
+                                      />
+                                    </div>
+
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-sm text-slate-700">Open Amount</span>
+                                      <ToggleSwitch
+                                        enabled={settings.attributionTypes.openAmount}
+                                        onChange={(value) => handleAttributionChange('openAmount', value)}
+                                      />
+                                    </div>
+
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-sm text-slate-700">Account Balance</span>
+                                      <ToggleSwitch
+                                        enabled={settings.attributionTypes.accountBalance}
+                                        onChange={(value) => handleAttributionChange('accountBalance', value)}
+                                      />
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </div>
                       </div>
 
-                      {/* Display Options */}
-                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-                        <div className="px-4 py-4 border-b border-slate-200">
-                          <h3 className="text-base font-medium text-slate-900">Display Options</h3>
-                        </div>
-                        
-                        <div className="px-4 py-3 space-y-4">
-                          {/* Link Expiration */}
-                          <div>
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center">
-                                <span className="text-sm font-medium text-slate-700">Link Expiration</span>
-                                <InfoTooltip text="Set how many days payment links remain active before expiring" />
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <input
-                                  type="number"
-                                  value={settings.linkExpirationDays}
-                                  onChange={(e) => handleToggle('linkExpirationDays', parseInt(e.target.value) || 90)}
-                                  min="1"
-                                  max="365"
-                                  className="w-20 px-2 py-1 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
-                                />
-                                <span className="text-sm text-slate-500">days</span>
-                              </div>
-                            </div>
-                            <p className="text-xs text-slate-500">Payment links will automatically expire after this period</p>
+                      {/* API Model - Right 1/3 */}
+                      <div className="lg:col-span-1">
+                        <div className="bg-slate-900 rounded-xl border border-slate-700 shadow-sm sticky top-6">
+                          <div className="px-4 py-4 border-b border-slate-700">
+                            <h3 className="text-base font-medium text-white">API Model</h3>
+                            <p className="text-sm text-slate-400 mt-1">JSON representation of org settings</p>
                           </div>
 
-                          {/* Invoice Details Visibility */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                              <span className="text-sm font-medium text-slate-700">Show Invoice Details</span>
-                              <InfoTooltip text="Display invoice information section on payment link pages" />
-                            </div>
-                            <ToggleSwitch 
-                              enabled={settings.showInvoiceDetails}
-                              onChange={(value) => handleToggle('showInvoiceDetails', value)}
-                            />
+                          <div className="p-4">
+                            <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap overflow-x-auto">
+{JSON.stringify({
+  autoGenerate: {
+    enabled: settings.autoGenerate.enabled,
+    mode: settings.autoGenerate.mode
+  },
+  accountLevelDisable: settings.accountLevelDisable,
+  adHocEnabled: settings.adHocEnabled,
+  attributionTypes: {
+    invoice: settings.attributionTypes.invoice,
+    openAmount: settings.attributionTypes.openAmount,
+    accountBalance: settings.attributionTypes.accountBalance
+  }
+}, null, 2)}
+                            </pre>
                           </div>
-
-                          {/* PDF Options */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                              <span className="text-sm font-medium text-slate-700">Enable PDF Preview & Download</span>
-                              <InfoTooltip text="Allow customers to preview and download invoice PDFs" />
-                            </div>
-                            <ToggleSwitch 
-                              enabled={settings.enablePdfOptions}
-                              onChange={(value) => handleToggle('enablePdfOptions', value)}
-                              disabled={!settings.showInvoiceDetails}
-                            />
-                          </div>
-                          {!settings.showInvoiceDetails && (
-                            <p className="text-xs text-slate-500 ml-4">PDF options require invoice details to be shown</p>
-                          )}
                         </div>
                       </div>
                     </div>
