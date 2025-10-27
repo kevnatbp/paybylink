@@ -50,8 +50,11 @@ const PaymentLinksPrototype = () => {
 
   const [paymentAmount, setPaymentAmount] = useState('125.00');
   const [paymentType, setPaymentType] = useState('credit');
-  const [commentText, setCommentText] = useState('');
-  const [commentError, setCommentError] = useState(null);
+  const [currency, setCurrency] = useState('USD');
+  const [mandateAccepted, setMandateAccepted] = useState(false);
+  const [showMandateModal, setShowMandateModal] = useState(false);
+  const [_commentText, _setCommentText] = useState('');
+  const [_commentError, _setCommentError] = useState(null);
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editingCommentText, setEditingCommentText] = useState('');
 
@@ -63,8 +66,8 @@ const PaymentLinksPrototype = () => {
   // Use the Supabase comments hook
   const {
     comments,
-    loading: commentsLoading,
-    error: commentsError,
+    loading: _commentsLoading,
+    error: _commentsError,
     addComment,
     deleteComment,
     updateComment
@@ -163,6 +166,14 @@ const PaymentLinksPrototype = () => {
 
   const handlePayment = () => {
     console.log('Processing payment of:', paymentAmount);
+
+    // Check if CAD currency with mandate acceptance
+    if (currency === 'CAD' && mandateAccepted) {
+      setShowMandateModal(true);
+    } else {
+      // Process payment normally for other currencies or without mandate
+      console.log('Processing payment normally');
+    }
   };
 
   const handlePreviewInvoice = () => {
@@ -205,7 +216,7 @@ const PaymentLinksPrototype = () => {
 
   const getEnabledAttributionTypes = () => {
     return Object.entries(settings.attributionTypes)
-      .filter(([key, enabled]) => enabled)
+      .filter(([_key, enabled]) => enabled)
       .map(([key]) => key);
   };
 
@@ -337,7 +348,7 @@ const PaymentLinksPrototype = () => {
     </button>
   );
 
-  const formatDate = (dateString) => {
+  const _formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleString('en-US', {
       month: 'long',
@@ -571,6 +582,27 @@ const PaymentLinksPrototype = () => {
                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 p-6">
                     {/* Payment Form - Left Side */}
                     <div className="space-y-6">
+                      {/* Currency Selector */}
+                      <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                          Currency
+                        </label>
+                        <select
+                          value={currency}
+                          onChange={(e) => {
+                            setCurrency(e.target.value);
+                            // Reset mandate acceptance when currency changes
+                            if (e.target.value !== 'CAD') {
+                              setMandateAccepted(false);
+                            }
+                          }}
+                          className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
+                        >
+                          <option value="USD">USD - US Dollar</option>
+                          <option value="CAD">CAD - Canadian Dollar</option>
+                        </select>
+                      </div>
+
                       {/* Payment Amount and Method */}
                       <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
                         <div className="flex items-start justify-between">
@@ -581,7 +613,7 @@ const PaymentLinksPrototype = () => {
                               Payment Amount
                             </label>
                             <div className="flex items-center">
-                              <span className="text-sm text-slate-500 mr-3 font-medium">USD</span>
+                              <span className="text-sm text-slate-500 mr-3 font-medium">{currency}</span>
                               <input
                                 type="number"
                                 value={paymentAmount}
@@ -633,6 +665,28 @@ const PaymentLinksPrototype = () => {
                           </div>
                         </div>
                       </div>
+
+                      {/* Direct Debit Mandate for CAD */}
+                      {currency === 'CAD' && (
+                        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                          <label className="flex items-start">
+                            <input
+                              type="checkbox"
+                              checked={mandateAccepted}
+                              onChange={(e) => setMandateAccepted(e.target.checked)}
+                              className="h-4 w-4 text-slate-600 border-slate-300 focus:ring-slate-500 mt-0.5 mr-3"
+                            />
+                            <div>
+                              <span className="text-sm font-medium text-slate-700">
+                                I authorize direct debit mandate for future payments
+                              </span>
+                              <p className="text-xs text-slate-500 mt-1">
+                                Required for CAD payments to enable automated future transactions
+                              </p>
+                            </div>
+                          </label>
+                        </div>
+                      )}
 
                       {/* Payment Form Fields */}
                       <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
@@ -713,9 +767,14 @@ const PaymentLinksPrototype = () => {
                       {/* Pay Button */}
                       <button
                         onClick={handlePayment}
-                        className="w-full bg-slate-800 text-white py-3 px-4 rounded-lg text-base font-semibold hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 transition-colors shadow-lg"
+                        disabled={currency === 'CAD' && !mandateAccepted}
+                        className={`w-full py-3 px-4 rounded-lg text-base font-semibold focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 transition-colors shadow-lg ${
+                          currency === 'CAD' && !mandateAccepted
+                            ? 'bg-slate-400 text-slate-600 cursor-not-allowed'
+                            : 'bg-slate-800 text-white hover:bg-slate-900'
+                        }`}
                       >
-                        Pay ${paymentAmount}
+                        Pay {currency === 'USD' ? '$' : currency === 'CAD' ? 'C$' : ''}{paymentAmount}
                       </button>
                       
                       <p className="text-xs text-slate-500 text-center">
@@ -1423,6 +1482,50 @@ const PaymentLinksPrototype = () => {
           </div>
         </div>
       </div>
+
+      {/* Direct Debit Mandate Modal */}
+      {showMandateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-900">Direct Debit Mandate</h3>
+              <button
+                onClick={() => setShowMandateModal(false)}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <span className="sr-only">Close</span>
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="mb-6">
+              <p className="text-sm text-slate-600 mb-4">
+                Your payment has been initiated. To complete the direct debit mandate setup for future payments, please review the mandate documentation.
+              </p>
+            </div>
+
+            <div className="flex space-x-3">
+              <button
+                onClick={() => {
+                  console.log('Opening mandate document');
+                  // In a real implementation, this would open the mandate document
+                }}
+                className="flex-1 bg-slate-800 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-slate-900 transition-colors"
+              >
+                Click here to view mandate
+              </button>
+              <button
+                onClick={() => setShowMandateModal(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
