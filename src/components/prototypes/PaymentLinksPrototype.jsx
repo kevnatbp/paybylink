@@ -309,13 +309,12 @@ const PaymentLinksPrototype = () => {
   );
 
   const InfoTooltip = ({ text }) => (
-    <div className="group relative inline-block ml-1">
-      <svg className="h-3.5 w-3.5 text-slate-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="10"/>
-        <path d="m9,9 0,0a3,3 0 1,1 6,0c0,2 -3,3 -3,3"/>
-        <path d="m12,17 .01,0"/>
-      </svg>
-      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-lg">
+    <div className="group relative inline-block ml-2">
+      <div className="h-4 w-4 rounded-full bg-black flex items-center justify-center cursor-help">
+        <span className="text-white text-xs font-bold">?</span>
+      </div>
+      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 shadow-lg max-w-xs">
+        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-black"></div>
         {text}
       </div>
     </div>
@@ -1005,7 +1004,7 @@ const PaymentLinksPrototype = () => {
 
               {activeTab === 'settings' && (
                 // Organization Link Settings Mode
-                <div className="bg-white rounded-xl shadow-xl border border-slate-200">
+                <div className="bg-white rounded-xl shadow-xl border border-slate-200 mb-6">
                   <div className="p-6">
                     <div className="flex items-center justify-between mb-6">
                       <div>
@@ -1022,7 +1021,7 @@ const PaymentLinksPrototype = () => {
                       <div className="lg:col-span-2">
                         <div className="space-y-6">
                           {/* Auto-Generate Payment Links */}
-                          <div className="space-y-4">
+                          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-4">
                             <div className="flex items-center justify-between">
                               <div>
                                 <div className="flex items-center">
@@ -1096,7 +1095,7 @@ const PaymentLinksPrototype = () => {
                           </div>
 
                           {/* Ad-hoc Payment Links */}
-                          <div className="space-y-4">
+                          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-4">
                             <div className="flex items-center justify-between">
                               <div>
                                 <div className="flex items-center">
@@ -1189,7 +1188,7 @@ const PaymentLinksPrototype = () => {
 
               {activeTab === 'profile' && (
                 // Payment Link Profile Mode
-                <div className="bg-white rounded-xl shadow-xl border border-slate-200">
+                <div className="bg-white rounded-xl shadow-xl border border-slate-200 mb-6">
                   <div className="p-6">
                     <div className="flex items-center justify-between mb-6">
                       <div>
@@ -1206,7 +1205,7 @@ const PaymentLinksPrototype = () => {
                       <div className="lg:col-span-2">
                         <div className="space-y-6">
                           {/* Applied To */}
-                          <div className="space-y-4">
+                          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-4">
                             <div>
                               <h3 className="text-base font-medium text-slate-900">Applied To</h3>
                               <p className="text-sm text-slate-600 mt-1">Configure which accounts this profile applies to</p>
@@ -1289,7 +1288,7 @@ const PaymentLinksPrototype = () => {
                           </div>
 
                           {/* Display Options */}
-                          <div className="space-y-4">
+                          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-4">
                             <div>
                               <h3 className="text-base font-medium text-slate-900">Display Options</h3>
                               <p className="text-sm text-slate-600 mt-1">Configure customer-facing interface</p>
@@ -1349,7 +1348,7 @@ const PaymentLinksPrototype = () => {
                           </div>
 
                           {/* Payment Options */}
-                          <div className="space-y-4">
+                          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-4">
                             <div>
                               <h3 className="text-base font-medium text-slate-900">Payment Options</h3>
                               <p className="text-sm text-slate-600 mt-1">Configure payment flexibility</p>
