@@ -177,6 +177,35 @@ export const mockLockboxFiles = [
           }
         ],
         unallocatedAmount: 230.00
+      },
+      {
+        id: 'payment-999888',
+        amount: 1150.00,
+        reference: 'INV-777',
+        otherParty: 'Foxtrot Solutions',
+        date: '2025-11-30',
+        bankAccount: 'B061801',
+        status: 'proposed',
+        ruleApplied: 'rule-1',
+        ruleExplanation: 'Invoice number exact match',
+        expanded: false,
+        issues: [],
+        invoices: [
+          {
+            id: 'inv-777',
+            invoiceNumber: 'INV-777',
+            customerId: 'FOXTROT001',
+            customerName: 'Foxtrot Solutions',
+            proposedAmount: 1150.00,
+            status: 'proposed',
+            expanded: false,
+            lineItems: [
+              { id: 'line-777-1', description: 'Consulting Services', amount: 950.00, status: 'proposed', matchDescription: 'Payment amount matched line item amount' },
+              { id: 'line-777-2', description: 'Implementation Fee', amount: 200.00, status: 'proposed', matchDescription: 'Payment amount matched line item amount' }
+            ]
+          }
+        ],
+        unallocatedAmount: 0
       }
     ]
   }

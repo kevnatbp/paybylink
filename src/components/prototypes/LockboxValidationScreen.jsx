@@ -44,12 +44,18 @@ const flattenData = (files) => {
     });
 
     if (file.expanded) {
-      // Sort transactions to put "needs_review" items first
+      // Sort transactions to put "needs_review" items first, then by payment ID for stable positioning
       const sortedTransactions = [...file.transactions].sort((a, b) => {
         const statusOrder = { 'needs_review': 0, 'proposed': 1, 'valid': 2 };
         const aStatus = (a.issues?.length > 0 || a.status === 'needs_review') ? 'needs_review' : (a.status || 'needs_review');
         const bStatus = (b.issues?.length > 0 || b.status === 'needs_review') ? 'needs_review' : (b.status || 'needs_review');
-        return (statusOrder[aStatus] || 99) - (statusOrder[bStatus] || 99);
+
+        // Primary sort: status priority
+        const statusDiff = (statusOrder[aStatus] || 99) - (statusOrder[bStatus] || 99);
+        if (statusDiff !== 0) return statusDiff;
+
+        // Secondary sort: payment ID for stable positioning
+        return a.id.localeCompare(b.id);
       });
 
       sortedTransactions.forEach(txn => {
@@ -462,7 +468,12 @@ const LockboxValidationScreen = () => {
             if (txn.id !== transactionId) return txn;
 
             if (type === 'transaction') {
-              return { ...txn, status: newStatus };
+              // Clear issues when approving (setting to 'valid')
+              const updatedTxn = { ...txn, status: newStatus };
+              if (newStatus === 'valid') {
+                updatedTxn.issues = [];
+              }
+              return updatedTxn;
             }
 
             return {
@@ -501,7 +512,7 @@ const LockboxValidationScreen = () => {
       'valid': {
         color: 'text-green-700 bg-green-100 border border-green-200 px-2 py-1 rounded-full',
         icon: <CheckCircle className="h-3 w-3" />,
-        label: 'Valid'
+        label: 'Approved'
       },
       'proposed': {
         color: 'text-blue-700 bg-blue-100 border border-blue-200 px-2 py-1 rounded-full',
@@ -579,6 +590,7 @@ const LockboxValidationScreen = () => {
 
     if (type === 'transaction') {
       const needsReview = item.status === 'needs_review' || item.issues.length > 0;
+      const isApproved = item.status === 'valid' && item.issues.length === 0;
 
       return (
         <div className="flex space-x-1 justify-center">
@@ -594,11 +606,18 @@ const LockboxValidationScreen = () => {
             >
               🔍
             </button>
+          ) : isApproved ? (
+            <div
+              className="p-1 border border-green-300 bg-green-100 text-green-700 rounded text-xs w-6 h-6 flex items-center justify-center"
+              title="Approved"
+            >
+              ✓
+            </div>
           ) : (
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                updateItemStatus('transaction', fileId, transactionId, null, null, 'approved');
+                updateItemStatus('transaction', fileId, transactionId, null, null, 'valid');
               }}
               className="p-1 border border-slate-300 text-slate-600 rounded text-xs hover:bg-green-100 hover:border-green-300 transition-colors w-6 h-6 flex items-center justify-center"
               title="Approve"
@@ -819,11 +838,12 @@ const LockboxValidationScreen = () => {
                   return allRows.map((row, index) => {
                     const { type, transactionId } = row.original;
 
-                    // Calculate background color based on payment grouping
+                    // Calculate background color based on payment grouping (stable positioning)
                     let backgroundClass;
                     if (type === 'file') {
                       backgroundClass = 'bg-white'; // Files get white background
                     } else {
+                      // Use payment ID position for stable alternating colors, regardless of status
                       const transactionIndex = transactionIds.indexOf(transactionId);
                       const isEvenPayment = transactionIndex % 2 === 0;
                       backgroundClass = isEvenPayment ? 'bg-slate-50' : 'bg-white';
@@ -832,7 +852,7 @@ const LockboxValidationScreen = () => {
                   return (
                     <tr
                       key={row.id}
-                      className={`border-b hover:bg-blue-50 hover:border-blue-200 transition-colors ${backgroundClass}`}
+                      className={`border-b hover:bg-blue-50 hover:border-blue-200 transition-all duration-300 ${backgroundClass}`}
                     >
                       {row.getVisibleCells().map((cell, index, array) => (
                         <td
