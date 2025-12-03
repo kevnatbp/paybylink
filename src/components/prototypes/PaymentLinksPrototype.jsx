@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Eye, Settings, Download, Plus, MessageSquare, Send, User, Edit2, Trash2, Receipt, DollarSign, CreditCard, FileText, Wallet, Calendar, Pencil } from 'lucide-react';
+import { Eye, Settings, Download, Plus, MessageSquare, Send, User, Edit2, Trash2, Receipt, DollarSign, CreditCard, FileText, Wallet, Calendar, Pencil, UserPlus } from 'lucide-react';
 import { useSupabaseComments } from '../../hooks/useComments';
 import { useParams } from 'react-router-dom';
+import RegistrationFlow from './RegistrationFlow';
 
 const PaymentLinksPrototype = () => {
   const { prototypeId } = useParams();
@@ -36,11 +37,17 @@ const PaymentLinksPrototype = () => {
     },
     allowPartialPayments: true,
     allowOverpayments: true,
+    partialPaymentPercentage: 25,
+    overpaymentPercentage: 150,
     showInvoiceDetails: true,
     enablePdfOptions: true,
     minimumPartialPayment: 25,
     maximumOverpayment: 150,
     linkExpirationDays: 90,
+    paymentGatewayProfiles: {
+      creditCard: 'BP Pay Merchant-Credit Card',
+      directDebit: 'BP Pay Merchant-ACH'
+    },
     appliedTo: {
       type: 'all_accounts',
       formula: "Account.tier = 'enterprise'",
@@ -139,6 +146,16 @@ const PaymentLinksPrototype = () => {
     }));
   };
 
+  const handlePaymentGatewayChange = (field, value) => {
+    setSettings(prev => ({
+      ...prev,
+      paymentGatewayProfiles: {
+        ...prev.paymentGatewayProfiles,
+        [field]: value
+      }
+    }));
+  };
+
   const handleStartEditingName = () => {
     setTempUserName(userName);
     setIsEditingName(true);
@@ -216,7 +233,7 @@ const PaymentLinksPrototype = () => {
 
   const getEnabledAttributionTypes = () => {
     return Object.entries(settings.attributionTypes)
-      .filter(([_key, enabled]) => enabled)
+      .filter(([, enabled]) => enabled)
       .map(([key]) => key);
   };
 
@@ -324,7 +341,7 @@ const PaymentLinksPrototype = () => {
       <div className="h-4 w-4 rounded-full bg-black flex items-center justify-center cursor-help">
         <span className="text-white text-xs font-bold">?</span>
       </div>
-      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 shadow-lg max-w-xs">
+      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-lg w-64 text-center">
         <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-black"></div>
         {text}
       </div>
@@ -336,8 +353,8 @@ const PaymentLinksPrototype = () => {
       onClick={() => onClick(id)}
       className={`
         flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200
-        ${isActive 
-          ? 'bg-slate-800 text-white shadow-lg' 
+        ${isActive
+          ? 'bg-slate-800 text-white shadow-lg'
           : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'
         }
         w-full md:w-auto
@@ -391,6 +408,13 @@ const PaymentLinksPrototype = () => {
                 label="Profile"
                 icon={User}
                 isActive={activeTab === 'profile'}
+                onClick={handleTabChange}
+              />
+              <SidebarNavItem
+                id="registration"
+                label="Registration"
+                icon={UserPlus}
+                isActive={activeTab === 'registration'}
                 onClick={handleTabChange}
               />
             </nav>
@@ -574,8 +598,13 @@ const PaymentLinksPrototype = () => {
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
-          <div className="flex-1 overflow-y-auto p-6">
-            <div className="max-w-7xl mx-auto">
+          {activeTab === 'registration' ? (
+            <div className="flex-1">
+              <RegistrationFlow />
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="max-w-7xl mx-auto">
               {activeTab === 'preview' && (
                 // Preview Mode
                 <div className="bg-white rounded-xl shadow-xl border border-slate-200">
@@ -1263,87 +1292,130 @@ const PaymentLinksPrototype = () => {
                       {/* Profile Settings Panel - Left 2/3 */}
                       <div className="lg:col-span-2">
                         <div className="space-y-6">
-                          {/* Applied To */}
-                          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-4">
-                            <div>
-                              <h3 className="text-base font-medium text-slate-900">Applied To</h3>
-                              <p className="text-sm text-slate-600 mt-1">Configure which accounts this profile applies to</p>
-                            </div>
-
-                            <div>
-                              <h4 className="text-sm font-medium text-slate-700 mb-3">Application Scope</h4>
-                              <div className="space-y-3">
-                                <label className="flex items-start">
-                                  <input
-                                    type="radio"
-                                    name="appliedToType"
-                                    value="all_accounts"
-                                    checked={settings.appliedTo.type === 'all_accounts'}
-                                    onChange={(e) => handleAppliedToChange('type', e.target.value)}
-                                    className="h-4 w-4 text-slate-600 border-slate-300 focus:ring-slate-500 mt-0.5"
-                                  />
-                                  <div className="ml-3">
-                                    <span className="text-sm font-medium text-slate-700">All Accounts</span>
-                                    <p className="text-xs text-slate-500 mt-0.5">Apply to all accounts in the system</p>
-                                  </div>
-                                </label>
-
-                                <label className="flex items-start">
-                                  <input
-                                    type="radio"
-                                    name="appliedToType"
-                                    value="conditional"
-                                    checked={settings.appliedTo.type === 'conditional'}
-                                    onChange={(e) => handleAppliedToChange('type', e.target.value)}
-                                    className="h-4 w-4 text-slate-600 border-slate-300 focus:ring-slate-500 mt-0.5"
-                                  />
-                                  <div className="ml-3">
-                                    <span className="text-sm font-medium text-slate-700">Conditional</span>
-                                    <p className="text-xs text-slate-500 mt-0.5">Apply based on specific criteria</p>
-                                  </div>
-                                </label>
+                          {/* Applied To and Payment Gateway Profiles - Side by Side */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Applied To */}
+                            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-4">
+                              <div>
+                                <h3 className="text-base font-medium text-slate-900">Applied To</h3>
+                                <p className="text-sm text-slate-600 mt-1">Configure which accounts this profile applies to</p>
                               </div>
-                            </div>
 
-                            {/* Conditional Settings */}
-                            {settings.appliedTo.type === 'conditional' && (
-                              <div className="ml-4 pl-4 border-l-2 border-slate-100 space-y-4">
-                                <div>
-                                  <div className="flex items-center mb-2">
-                                    <label className="text-sm font-medium text-slate-700">Formula</label>
-                                    <InfoTooltip text="Define the condition using dot notation for account properties" />
-                                  </div>
-                                  <input
-                                    type="text"
-                                    value={settings.appliedTo.formula}
-                                    onChange={(e) => handleAppliedToChange('formula', e.target.value)}
-                                    placeholder="Account.tier = 'enterprise'"
-                                    className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm font-mono"
-                                  />
-                                  <p className="text-xs text-slate-500 mt-1">
-                                    Examples: Account.tier = 'enterprise', Account.balance &gt; 1000, Account.type = 'premium'
-                                  </p>
-                                </div>
-
-                                <div>
-                                  <div className="flex items-center mb-2">
-                                    <label className="text-sm font-medium text-slate-700">Priority</label>
-                                    <InfoTooltip text="Higher numbers take precedence when multiple conditions match" />
-                                  </div>
-                                  <div className="flex items-center space-x-2">
+                              <div>
+                                <h4 className="text-sm font-medium text-slate-700 mb-3">Application Scope</h4>
+                                <div className="space-y-3">
+                                  <label className="flex items-start">
                                     <input
-                                      type="number"
-                                      value={settings.appliedTo.priority}
-                                      onChange={(e) => handleAppliedToChange('priority', parseInt(e.target.value) || 1)}
-                                      min="1"
-                                      max="100"
-                                      className="w-20 px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
+                                      type="radio"
+                                      name="appliedToType"
+                                      value="all_accounts"
+                                      checked={settings.appliedTo.type === 'all_accounts'}
+                                      onChange={(e) => handleAppliedToChange('type', e.target.value)}
+                                      className="h-4 w-4 text-slate-600 border-slate-300 focus:ring-slate-500 mt-0.5"
                                     />
-                                    <span className="text-sm text-slate-500">(1 = lowest, 100 = highest)</span>
-                                  </div>
+                                    <div className="ml-3">
+                                      <span className="text-sm font-medium text-slate-700">All Accounts</span>
+                                      <p className="text-xs text-slate-500 mt-0.5">Apply to all accounts in the system</p>
+                                    </div>
+                                  </label>
+
+                                  <label className="flex items-start">
+                                    <input
+                                      type="radio"
+                                      name="appliedToType"
+                                      value="conditional"
+                                      checked={settings.appliedTo.type === 'conditional'}
+                                      onChange={(e) => handleAppliedToChange('type', e.target.value)}
+                                      className="h-4 w-4 text-slate-600 border-slate-300 focus:ring-slate-500 mt-0.5"
+                                    />
+                                    <div className="ml-3">
+                                      <span className="text-sm font-medium text-slate-700">Conditional</span>
+                                      <p className="text-xs text-slate-500 mt-0.5">Apply based on specific criteria</p>
+                                    </div>
+                                  </label>
                                 </div>
                               </div>
-                            )}
+
+                              {/* Conditional Settings */}
+                              {settings.appliedTo.type === 'conditional' && (
+                                <div className="ml-4 pl-4 border-l-2 border-slate-100 space-y-4">
+                                  <div>
+                                    <div className="flex items-center mb-2">
+                                      <label className="text-sm font-medium text-slate-700">Formula</label>
+                                      <InfoTooltip text="Define the condition using dot notation for account properties" />
+                                    </div>
+                                    <input
+                                      type="text"
+                                      value={settings.appliedTo.formula}
+                                      onChange={(e) => handleAppliedToChange('formula', e.target.value)}
+                                      placeholder="Account.tier = 'enterprise'"
+                                      className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm font-mono"
+                                    />
+                                    <p className="text-xs text-slate-500 mt-1">
+                                      Examples: Account.tier = 'enterprise', Account.balance &gt; 1000, Account.type = 'premium'
+                                    </p>
+                                  </div>
+
+                                  <div>
+                                    <div className="flex items-center mb-2">
+                                      <label className="text-sm font-medium text-slate-700">Priority</label>
+                                      <InfoTooltip text="Higher numbers take precedence when multiple conditions match" />
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <input
+                                        type="number"
+                                        value={settings.appliedTo.priority}
+                                        onChange={(e) => handleAppliedToChange('priority', parseInt(e.target.value) || 1)}
+                                        min="1"
+                                        max="100"
+                                        className="w-20 px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
+                                      />
+                                      <span className="text-sm text-slate-500">(1 = lowest, 100 = highest)</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Payment Gateway Profiles */}
+                            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-4">
+                              <div>
+                                <h3 className="text-base font-medium text-slate-900">Payment Gateway Profiles</h3>
+                                <p className="text-sm text-slate-600 mt-1">Configure payment processing gateways</p>
+                              </div>
+
+                              <div className="space-y-4">
+                                {/* Credit Card Gateway */}
+                                <div>
+                                  <div className="flex items-center mb-2">
+                                    <label className="text-sm font-medium text-slate-700">Credit Card Gateway</label>
+                                    <InfoTooltip text="Select the payment gateway for credit card transactions" />
+                                  </div>
+                                  <select
+                                    value={settings.paymentGatewayProfiles.creditCard}
+                                    onChange={(e) => handlePaymentGatewayChange('creditCard', e.target.value)}
+                                    className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
+                                  >
+                                    <option value="BP Pay Merchant-Credit Card">BP Pay Merchant-Credit Card</option>
+                                  </select>
+                                </div>
+
+                                {/* Direct Debit Gateway */}
+                                <div>
+                                  <div className="flex items-center mb-2">
+                                    <label className="text-sm font-medium text-slate-700">Direct Debit Gateway</label>
+                                    <InfoTooltip text="Select the payment gateway for direct debit/ACH transactions" />
+                                  </div>
+                                  <select
+                                    value={settings.paymentGatewayProfiles.directDebit}
+                                    onChange={(e) => handlePaymentGatewayChange('directDebit', e.target.value)}
+                                    className="block w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
+                                  >
+                                    <option value="BP Pay Merchant-ACH">BP Pay Merchant-ACH</option>
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
                           </div>
 
                           {/* Display Options */}
@@ -1415,27 +1487,77 @@ const PaymentLinksPrototype = () => {
 
                             <div className="space-y-4">
                               {/* Allow Partial Payments */}
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center">
-                                  <span className="text-sm font-medium text-slate-700">Allow Partial Payments</span>
-                                  <InfoTooltip text="Enable customers to pay less than the full amount" />
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center">
+                                    <span className="text-sm font-medium text-slate-700">Allow Partial Payments</span>
+                                    <InfoTooltip text="Enable customers to pay less than the full amount" />
+                                  </div>
+                                  <ToggleSwitch
+                                    enabled={settings.allowPartialPayments}
+                                    onChange={(value) => handleToggle('allowPartialPayments', value)}
+                                  />
                                 </div>
-                                <ToggleSwitch
-                                  enabled={settings.allowPartialPayments}
-                                  onChange={(value) => handleToggle('allowPartialPayments', value)}
-                                />
+
+                                {/* Partial Payment Percentage */}
+                                {settings.allowPartialPayments && (
+                                  <div className="ml-4 pl-4 border-l-2 border-slate-100">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center">
+                                        <span className="text-sm font-medium text-slate-700">Minimum Partial Payment</span>
+                                        <InfoTooltip text="Minimum percentage of total amount for partial payments" />
+                                      </div>
+                                      <div className="flex items-center space-x-2">
+                                        <input
+                                          type="number"
+                                          value={settings.partialPaymentPercentage}
+                                          onChange={(e) => handleToggle('partialPaymentPercentage', parseInt(e.target.value) || 25)}
+                                          min="1"
+                                          max="99"
+                                          className="w-16 px-2 py-1 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
+                                        />
+                                        <span className="text-sm text-slate-500">%</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
 
                               {/* Allow Overpayments */}
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center">
-                                  <span className="text-sm font-medium text-slate-700">Allow Overpayments</span>
-                                  <InfoTooltip text="Enable customers to pay more than the amount due" />
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center">
+                                    <span className="text-sm font-medium text-slate-700">Allow Overpayments</span>
+                                    <InfoTooltip text="Enable customers to pay more than the amount due" />
+                                  </div>
+                                  <ToggleSwitch
+                                    enabled={settings.allowOverpayments}
+                                    onChange={(value) => handleToggle('allowOverpayments', value)}
+                                  />
                                 </div>
-                                <ToggleSwitch
-                                  enabled={settings.allowOverpayments}
-                                  onChange={(value) => handleToggle('allowOverpayments', value)}
-                                />
+
+                                {/* Overpayment Percentage */}
+                                {settings.allowOverpayments && (
+                                  <div className="ml-4 pl-4 border-l-2 border-slate-100">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center">
+                                        <span className="text-sm font-medium text-slate-700">Maximum Overpayment</span>
+                                        <InfoTooltip text="Maximum percentage above total amount for overpayments" />
+                                      </div>
+                                      <div className="flex items-center space-x-2">
+                                        <input
+                                          type="number"
+                                          value={settings.overpaymentPercentage}
+                                          onChange={(e) => handleToggle('overpaymentPercentage', parseInt(e.target.value) || 150)}
+                                          min="101"
+                                          max="500"
+                                          className="w-16 px-2 py-1 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
+                                        />
+                                        <span className="text-sm text-slate-500">%</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1460,6 +1582,10 @@ const PaymentLinksPrototype = () => {
         formula: settings.appliedTo.formula,
         priority: settings.appliedTo.priority
       },
+  paymentGatewayProfiles: {
+    creditCard: settings.paymentGatewayProfiles.creditCard,
+    directDebit: settings.paymentGatewayProfiles.directDebit
+  },
   displayOptions: {
     linkExpirationDays: settings.linkExpirationDays,
     showInvoiceDetails: settings.showInvoiceDetails,
@@ -1467,7 +1593,9 @@ const PaymentLinksPrototype = () => {
   },
   paymentOptions: {
     allowPartialPayments: settings.allowPartialPayments,
-    allowOverpayments: settings.allowOverpayments
+    allowOverpayments: settings.allowOverpayments,
+    partialPaymentPercentage: settings.allowPartialPayments ? settings.partialPaymentPercentage : null,
+    overpaymentPercentage: settings.allowOverpayments ? settings.overpaymentPercentage : null
   }
 }, null, 2)}
                             </pre>
@@ -1478,8 +1606,9 @@ const PaymentLinksPrototype = () => {
                   </div>
                 </div>
               )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
