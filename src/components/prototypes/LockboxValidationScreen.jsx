@@ -1,8 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   CheckCircle, AlertTriangle, X, Settings, Edit, FileText,
   ChevronDown, ChevronRight, DollarSign, TrendingUp, AlertCircle, Eye
 } from 'lucide-react';
+import {
+  useReactTable,
+  getCoreRowModel,
+  getExpandedRowModel,
+  getSortedRowModel,
+  flexRender,
+  createColumnHelper
+} from '@tanstack/react-table';
 import {
   mockLockboxFiles,
   ruleExplanations,
@@ -18,11 +26,105 @@ import {
  * Shows action status for each level with expand/collapse functionality
  */
 
+// Helper to flatten hierarchical data for TanStack Table
+const flattenData = (files) => {
+  const flattened = [];
+
+  files.forEach(file => {
+    // Add file row
+    flattened.push({
+      id: file.id,
+      type: 'file',
+      level: 0,
+      data: file,
+      parentId: null,
+      fileId: file.id,
+      transactionId: null,
+      invoiceId: null
+    });
+
+    if (file.expanded) {
+      // Sort transactions to put "needs_review" items first
+      const sortedTransactions = [...file.transactions].sort((a, b) => {
+        const statusOrder = { 'needs_review': 0, 'proposed': 1, 'valid': 2 };
+        const aStatus = (a.issues?.length > 0 || a.status === 'needs_review') ? 'needs_review' : (a.status || 'needs_review');
+        const bStatus = (b.issues?.length > 0 || b.status === 'needs_review') ? 'needs_review' : (b.status || 'needs_review');
+        return (statusOrder[aStatus] || 99) - (statusOrder[bStatus] || 99);
+      });
+
+      sortedTransactions.forEach(txn => {
+        // Add transaction row
+        flattened.push({
+          id: txn.id,
+          type: 'transaction',
+          level: 1,
+          data: txn,
+          parentId: file.id,
+          fileId: file.id,
+          transactionId: txn.id,
+          invoiceId: null
+        });
+
+        if (txn.expanded) {
+          txn.invoices.forEach(invoice => {
+            // Add invoice row
+            flattened.push({
+              id: invoice.id,
+              type: 'invoice',
+              level: 2,
+              data: invoice,
+              parentId: txn.id,
+              fileId: file.id,
+              transactionId: txn.id,
+              invoiceId: invoice.id
+            });
+
+            if (invoice.expanded) {
+              invoice.lineItems.forEach(lineItem => {
+                // Add line item row
+                flattened.push({
+                  id: lineItem.id,
+                  type: 'lineItem',
+                  level: 3,
+                  data: lineItem,
+                  parentId: invoice.id,
+                  fileId: file.id,
+                  transactionId: txn.id,
+                  invoiceId: invoice.id
+                });
+              });
+            }
+          });
+
+          // Add unallocated row if exists
+          if (txn.unallocatedAmount > 0) {
+            flattened.push({
+              id: `${txn.id}-unallocated`,
+              type: 'unallocated',
+              level: 2,
+              data: { ...txn, unallocatedAmount: txn.unallocatedAmount },
+              parentId: txn.id,
+              fileId: file.id,
+              transactionId: txn.id,
+              invoiceId: null
+            });
+          }
+        }
+      });
+    }
+  });
+
+  return flattened;
+};
+
+const columnHelper = createColumnHelper();
+
 const LockboxValidationScreen = () => {
   const [files, setFiles] = useState(mockLockboxFiles);
   const [selectedItem, setSelectedItem] = useState(null);
   const [showRuleDetails, setShowRuleDetails] = useState(false);
   const [showCorrectionModal, setShowCorrectionModal] = useState(false);
+  const [expanded, setExpanded] = useState({});
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', {
@@ -83,6 +185,271 @@ const LockboxValidationScreen = () => {
     });
   };
 
+  // Prepare flattened data for TanStack Table
+  const data = useMemo(() => flattenData(files), [files]);
+
+  // Define columns for TanStack Table
+  const columns = useMemo(() => [
+    columnHelper.accessor((row) => {
+      // Custom sort order to maintain hierarchy: File (0) → Payment (1) → Invoice (2) → Item (3) → Unallocated (2)
+      const typeSortOrder = {
+        'file': 0,
+        'transaction': 1,
+        'invoice': 2,
+        'unallocated': 2,
+        'lineItem': 3
+      };
+      return typeSortOrder[row.type] || 999;
+    }, {
+      id: 'type',
+      header: 'Type',
+      size: 80,
+      enableSorting: false,
+      cell: ({ row }) => {
+        const { type, level, data: itemData } = row.original;
+
+        // Calculate padding based on hierarchy level
+        const paddingLeft = level * 24 + 8; // 24px per level + 8px base padding
+
+        const typeLabels = {
+          file: 'File',
+          transaction: 'Payment',
+          invoice: 'Invoice',
+          lineItem: 'Item',
+          unallocated: 'Unallocated'
+        };
+
+        const canExpand = (type === 'file' && itemData.transactions?.length > 0) ||
+                         (type === 'transaction' && itemData.invoices?.length > 0) ||
+                         (type === 'invoice' && itemData.lineItems?.length > 0);
+
+        return (
+          <div className="flex items-center space-x-2" style={{ paddingLeft: `${paddingLeft}px` }}>
+            {canExpand ? (
+              <button
+                onClick={() => {
+                  if (type === 'file') {
+                    toggleExpanded('file', itemData.id);
+                  } else if (type === 'transaction') {
+                    toggleExpanded('transaction', row.original.fileId, itemData.id);
+                  } else if (type === 'invoice') {
+                    toggleExpanded('invoice', row.original.fileId, row.original.transactionId, itemData.id);
+                  }
+                }}
+                className="text-slate-500 hover:text-slate-700"
+              >
+                {row.getIsExpanded() ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </button>
+            ) : (
+              <div className="w-4 h-4"></div>
+            )}
+            <span className="text-xs text-slate-500 border border-slate-200 px-2 py-1 rounded whitespace-nowrap">
+              {typeLabels[type] || type}
+            </span>
+          </div>
+        );
+      }
+    }),
+
+    columnHelper.accessor((row) => {
+      const { type, data: itemData } = row;
+
+      // Define sort priority: lower numbers appear first
+      const statusSortOrder = {
+        'needs_review': 0,     // Highest priority - needs attention first
+        'Not Posted': 1,       // Files that need posting
+        'proposed': 2,         // Proposed allocations
+        'valid': 3            // Valid items last
+      };
+
+      let statusKey;
+      if (type === 'file') {
+        statusKey = 'Not Posted';
+      } else {
+        const status = itemData.status || 'needs_review';
+        const hasIssues = itemData.issues?.length > 0;
+        if (hasIssues && status !== 'needs_review') {
+          statusKey = 'needs_review';
+        } else {
+          statusKey = status;
+        }
+      }
+
+      return statusSortOrder[statusKey] ?? 999;
+    }, {
+      id: 'status',
+      header: 'Allocation Status',
+      size: 128,
+      enableSorting: false,
+      cell: ({ row }) => {
+        const { type, data: itemData } = row.original;
+
+        if (type === 'file') {
+          return (
+            <span className="inline-flex items-center space-x-1 text-xs text-orange-700 bg-orange-100 border border-orange-200 px-2 py-1 rounded-full">
+              <AlertTriangle className="h-3 w-3" />
+              <span>Not Posted</span>
+            </span>
+          );
+        }
+
+        const status = itemData.status || 'needs_review';
+        const hasIssues = itemData.issues?.length > 0;
+        const statusDisplay = getStatusDisplay(status, hasIssues);
+
+        return (
+          <span className={`inline-flex items-center space-x-1 text-xs ${statusDisplay.color}`}>
+            {statusDisplay.icon}
+            <span>{statusDisplay.label}</span>
+          </span>
+        );
+      }
+    }),
+
+    columnHelper.accessor('rule', {
+      id: 'rule',
+      header: 'Rule/Match',
+      size: 128,
+      cell: ({ row }) => {
+        const { type, data: itemData } = row.original;
+
+        if (type === 'file') {
+          return <span className="text-xs text-slate-500">Lockbox file uploaded</span>;
+        } else if (type === 'transaction') {
+          const ruleInfo = itemData.ruleApplied ? ruleExplanations[itemData.ruleApplied]?.name : 'No rules matched';
+          return <span className="text-xs text-slate-500">{ruleInfo}</span>;
+        } else if (type === 'invoice') {
+          return <span className="text-xs text-slate-500">Invoice allocation</span>;
+        } else if (type === 'lineItem') {
+          return <span className="text-xs text-slate-500">{itemData.matchDescription || 'No match description'}</span>;
+        } else if (type === 'unallocated') {
+          return <span className="text-xs text-slate-500">Manual assignment needed</span>;
+        }
+
+        return null;
+      }
+    }),
+
+    columnHelper.accessor('account', {
+      id: 'account',
+      header: 'Account',
+      size: 144,
+      cell: ({ row }) => {
+        const { type, data: itemData } = row.original;
+
+        if (type === 'transaction') {
+          return <span className="text-xs text-slate-600">{itemData.otherParty}</span>;
+        } else if (type === 'invoice') {
+          return <span className="text-xs text-slate-600">{itemData.customerName}</span>;
+        } else if (type === 'file') {
+          return <span className="text-xs text-slate-600">-</span>;
+        }
+
+        return <span className="text-xs text-slate-600">-</span>;
+      }
+    }),
+
+    columnHelper.accessor('id', {
+      id: 'id',
+      header: 'ID',
+      size: 144,
+      cell: ({ row }) => {
+        const { type, data: itemData } = row.original;
+
+        if (type === 'file') {
+          return (
+            <div className="flex items-center space-x-2">
+              <FileText className="h-4 w-4 text-slate-600" />
+              <span className="text-sm font-medium text-slate-800">{itemData.fileName}</span>
+            </div>
+          );
+        } else if (type === 'transaction') {
+          return <span className="text-sm font-medium text-slate-800">{itemData.id.split('-')[1]}</span>;
+        } else if (type === 'invoice') {
+          return (
+            <div className="flex items-center space-x-2">
+              <FileText className="h-4 w-4 text-green-600" />
+              <span className="text-sm font-medium text-slate-800">{itemData.invoiceNumber}</span>
+            </div>
+          );
+        } else if (type === 'lineItem') {
+          return <span className="text-sm text-slate-700">{itemData.description}</span>;
+        } else if (type === 'unallocated') {
+          return (
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="h-4 w-4 text-orange-600" />
+              <span className="text-sm font-medium text-orange-800">Unallocated Amount</span>
+            </div>
+          );
+        }
+
+        return null;
+      }
+    }),
+
+    columnHelper.accessor('amount', {
+      id: 'amount',
+      header: 'Amount',
+      size: 112,
+      cell: ({ row }) => {
+        const { type, data: itemData } = row.original;
+
+        let amount = 0;
+        let colorClass = 'text-slate-800';
+
+        if (type === 'file') {
+          amount = itemData.totalAmount;
+        } else if (type === 'transaction') {
+          amount = itemData.amount;
+        } else if (type === 'invoice') {
+          amount = itemData.proposedAmount;
+        } else if (type === 'lineItem') {
+          amount = itemData.amount;
+        } else if (type === 'unallocated') {
+          amount = itemData.unallocatedAmount;
+          colorClass = 'text-orange-600';
+        }
+
+        return <span className={`text-sm font-medium ${colorClass}`}>{formatCurrency(amount)}</span>;
+      }
+    }),
+
+    columnHelper.display({
+      id: 'actions',
+      header: 'Action',
+      size: 64,
+      cell: ({ row }) => {
+        const { type, data: itemData } = row.original;
+
+        return (
+          <div className="flex justify-center">
+            {renderActions(type, itemData, row.original.fileId, row.original.transactionId, row.original.invoiceId)}
+          </div>
+        );
+      }
+    })
+  ], [files]);
+
+  // Create TanStack Table instance
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getExpandedRowModel: getExpandedRowModel(),
+    enableSorting: false,
+    enableExpanding: true,
+    getRowCanExpand: (row) => {
+      const { type, data: itemData } = row.original;
+      return (type === 'file' && itemData.transactions?.length > 0) ||
+             (type === 'transaction' && itemData.invoices?.length > 0) ||
+             (type === 'invoice' && itemData.lineItems?.length > 0);
+    },
+    state: {
+      expanded
+    },
+    onExpandedChange: setExpanded
+  });
+
   // Update status for any item
   const updateItemStatus = (type, fileId, transactionId, invoiceId, lineItemId, newStatus) => {
     setFiles(prevFiles => {
@@ -127,7 +494,7 @@ const LockboxValidationScreen = () => {
   const getStatusDisplay = (status, hasIssues = false) => {
     const displays = {
       'needs_review': {
-        color: 'text-slate-700 bg-slate-100 border border-slate-200 px-2 py-1 rounded-full',
+        color: 'text-red-700 bg-red-50 border border-red-200 px-2 py-1 rounded-full',
         icon: <AlertTriangle className="h-3 w-3" />,
         label: 'Needs Review'
       },
@@ -264,218 +631,6 @@ const LockboxValidationScreen = () => {
     return null;
   };
 
-  // Render hierarchical table rows
-  const renderTableRows = () => {
-    const rows = [];
-    let rowIndex = 0;
-
-    files.forEach(file => {
-      const fileStatus = getStatusDisplay(file.status);
-      const isEvenRow = rowIndex % 2 === 0;
-
-      // File row
-      rows.push(
-        <tr key={file.id} className={`border-b hover:bg-blue-50 hover:border-blue-200 transition-colors ${isEvenRow ? 'bg-slate-50' : 'bg-white'}`}>
-          <td className="p-2 border-r border-slate-200">
-            {renderActions('file', file, file.id)}
-          </td>
-          <td className="p-2 border-r border-slate-200">
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => toggleExpanded('file', file.id)}
-                className="text-slate-500 hover:text-slate-700"
-              >
-                {file.expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </button>
-              <span className="text-xs text-slate-500 border border-slate-200 px-2 py-1 rounded">File</span>
-            </div>
-          </td>
-          <td className="p-2 border-r border-slate-200">
-            <span className="inline-flex items-center space-x-1 text-xs text-orange-700 bg-orange-100 border border-orange-200 px-2 py-1 rounded-full">
-              <AlertTriangle className="h-3 w-3" />
-              <span>Not Posted</span>
-            </span>
-          </td>
-          <td className="p-2 text-xs text-slate-500 border-r border-slate-200">Lockbox file uploaded</td>
-          <td className="p-2 text-xs text-slate-600 border-r border-slate-200">-</td>
-          <td className="p-2 border-r border-slate-200">
-            <div className="flex items-center space-x-2">
-              <FileText className="h-4 w-4 text-slate-600" />
-              <span className="text-sm font-medium text-slate-800">{file.fileName}</span>
-            </div>
-          </td>
-          <td className="p-2 text-sm font-medium text-slate-800">{formatCurrency(file.totalAmount)}</td>
-        </tr>
-      );
-      rowIndex++;
-
-      // Transaction rows (if file is expanded)
-      if (file.expanded) {
-        file.transactions.forEach(txn => {
-          const txnStatus = getStatusDisplay(txn.status, txn.issues.length > 0);
-          const ruleInfo = txn.ruleApplied ? ruleExplanations[txn.ruleApplied]?.name : 'No rule matched';
-          const isEvenRow = rowIndex % 2 === 0;
-
-          rows.push(
-            <tr key={txn.id} className={`border-b hover:bg-blue-50 hover:border-blue-200 transition-colors ${isEvenRow ? 'bg-slate-50' : 'bg-white'}`}>
-              <td className="p-2 border-r border-slate-200">
-                {renderActions('transaction', txn, file.id, txn.id)}
-              </td>
-              <td className="p-2 pl-8 border-r border-slate-200">
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => toggleExpanded('transaction', file.id, txn.id)}
-                    className="text-slate-500 hover:text-slate-700"
-                  >
-                    {txn.expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                  </button>
-                  <span className="text-xs text-slate-500 border border-slate-200 px-2 py-1 rounded">Payment</span>
-                </div>
-              </td>
-              <td className="p-2 border-r border-slate-200">
-                <span className={`inline-flex items-center space-x-1 text-xs ${txnStatus.color}`}>
-                  {txnStatus.icon}
-                  <span>{txnStatus.label}</span>
-                </span>
-              </td>
-              <td className="p-2 text-xs text-slate-500 border-r border-slate-200">
-                {txn.ruleApplied ? ruleInfo : 'No rules matched'}
-              </td>
-              <td className="p-2 text-xs text-slate-600 border-r border-slate-200">{txn.otherParty}</td>
-              <td className="p-2 border-r border-slate-200">
-                <span className="text-sm font-medium text-slate-800">{txn.id.split('-')[1]}</span>
-              </td>
-              <td className="p-2 text-sm font-medium text-slate-800">{formatCurrency(txn.amount)}</td>
-            </tr>
-          );
-          rowIndex++;
-
-          // Invoice rows (if transaction is expanded)
-          if (txn.expanded) {
-            txn.invoices.forEach(invoice => {
-              const invStatus = getStatusDisplay(invoice.status);
-              const isEvenRow = rowIndex % 2 === 0;
-
-              rows.push(
-                <tr key={invoice.id} className={`border-b hover:bg-blue-50 hover:border-blue-200 transition-colors ${isEvenRow ? 'bg-slate-50' : 'bg-white'}`}>
-                  <td className="p-2 border-r border-slate-200">
-                    {renderActions('invoice', invoice, file.id, txn.id, invoice.id)}
-                  </td>
-                  <td className="p-2 pl-12 border-r border-slate-200">
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => toggleExpanded('invoice', file.id, txn.id, invoice.id)}
-                        className="text-slate-500 hover:text-slate-700"
-                      >
-                        {invoice.expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                      </button>
-                      <span className="text-xs text-slate-500 border border-slate-200 px-2 py-1 rounded">Invoice</span>
-                    </div>
-                  </td>
-                  <td className="p-2 border-r border-slate-200">
-                    <span className={`inline-flex items-center space-x-1 text-xs ${invStatus.color}`}>
-                      {invStatus.icon}
-                      <span>{invStatus.label}</span>
-                    </span>
-                  </td>
-                  <td className="p-2 text-xs text-slate-500 border-r border-slate-200">Invoice allocation</td>
-                  <td className="p-2 text-xs text-slate-600 border-r border-slate-200">{invoice.customerName}</td>
-                  <td className="p-2 border-r border-slate-200">
-                    <div className="flex items-center space-x-2">
-                      <FileText className="h-4 w-4 text-green-600" />
-                      <span className="text-sm font-medium text-slate-800">{invoice.invoiceNumber}</span>
-                    </div>
-                  </td>
-                  <td className="p-2 text-sm font-medium text-slate-800">{formatCurrency(invoice.proposedAmount)}</td>
-                </tr>
-              );
-              rowIndex++;
-
-              // Line item rows (if invoice is expanded)
-              if (invoice.expanded) {
-                invoice.lineItems.forEach(lineItem => {
-                  const lineStatus = getStatusDisplay(lineItem.status);
-                  const isEvenRow = rowIndex % 2 === 0;
-
-                  rows.push(
-                    <tr key={lineItem.id} className={`border-b hover:bg-blue-50 hover:border-blue-200 transition-colors ${isEvenRow ? 'bg-slate-50' : 'bg-white'}`}>
-                      <td className="p-2 border-r border-slate-200"></td>
-                      <td className="p-2 pl-16 border-r border-slate-200">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-4 h-4"></div>
-                          <span className="text-xs text-slate-500 border border-slate-200 px-2 py-1 rounded whitespace-nowrap">Item</span>
-                        </div>
-                      </td>
-                      <td className="p-2 border-r border-slate-200">
-                        <span className={`inline-flex items-center space-x-1 text-xs ${lineStatus.color}`}>
-                          {lineStatus.icon}
-                          <span>{lineStatus.label}</span>
-                        </span>
-                      </td>
-                      <td className="p-2 text-xs text-slate-500 border-r border-slate-200">{lineItem.matchDescription || 'No match description'}</td>
-                      <td className="p-2 text-xs text-slate-600 border-r border-slate-200">-</td>
-                      <td className="p-2 border-r border-slate-200">
-                        <span className="text-sm text-slate-700">{lineItem.description}</span>
-                      </td>
-                      <td className="p-2 text-sm font-medium text-slate-800">{formatCurrency(lineItem.amount)}</td>
-                    </tr>
-                  );
-                  rowIndex++;
-                });
-              }
-            });
-
-            // Unallocated amount row (if exists)
-            if (txn.unallocatedAmount > 0) {
-              const isEvenRow = rowIndex % 2 === 0;
-              rows.push(
-                <tr key={`${txn.id}-unallocated`} className={`border-b hover:bg-blue-50 hover:border-blue-200 transition-colors ${isEvenRow ? 'bg-slate-50' : 'bg-white'}`}>
-                  <td className="p-2 border-r border-slate-200">
-                    <div className="flex space-x-1 justify-center">
-                      <button
-                        onClick={() => {
-                          setSelectedItem({ type: 'unallocated', item: txn, fileId: file.id, transactionId: txn.id });
-                          setShowCorrectionModal(true);
-                        }}
-                        className="p-1 border border-slate-300 text-slate-600 rounded text-xs hover:bg-yellow-100 hover:border-yellow-300 transition-colors w-6 h-6 flex items-center justify-center"
-                        title="Edit"
-                      >
-                        ✏️
-                      </button>
-                    </div>
-                  </td>
-                  <td className="p-2 pl-12 border-r border-slate-200">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-4 h-4"></div>
-                      <span className="text-xs text-slate-500 border border-slate-200 px-2 py-1 rounded">Unallocated</span>
-                    </div>
-                  </td>
-                  <td className="p-2 border-r border-slate-200">
-                    <span className="inline-flex items-center space-x-1 text-xs text-slate-700 bg-slate-100 border border-slate-200 px-2 py-1 rounded-full">
-                      <AlertTriangle className="h-3 w-3" />
-                      <span>Needs Review</span>
-                    </span>
-                  </td>
-                  <td className="p-2 text-xs text-slate-500 border-r border-slate-200">Manual assignment needed</td>
-                  <td className="p-2 text-xs text-slate-600 border-r border-slate-200">-</td>
-                  <td className="p-2 border-r border-slate-200">
-                    <div className="flex items-center space-x-2">
-                      <AlertTriangle className="h-4 w-4 text-orange-600" />
-                      <span className="text-sm font-medium text-orange-800">Unallocated Amount</span>
-                    </div>
-                  </td>
-                  <td className="p-2 text-sm font-medium text-orange-600">{formatCurrency(txn.unallocatedAmount)}</td>
-                </tr>
-              );
-              rowIndex++;
-            }
-          }
-        });
-      }
-    });
-
-    return rows;
-  };
 
   // Calculate if ready to post
   const canPost = files.every(file =>
@@ -632,23 +787,71 @@ const LockboxValidationScreen = () => {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-slate-50 border-b">
-                <tr>
-                  <th className="text-center p-2 font-medium text-slate-700 w-[8%] border-r border-slate-200">Action</th>
-                  <th className="text-left p-2 font-medium text-slate-700 w-[8%] border-r border-slate-200">Type</th>
-                  <th className="text-left p-2 font-medium text-slate-700 w-[17%] border-r border-slate-200">Allocation Status</th>
-                  <th className="text-left p-2 font-medium text-slate-700 w-[17%] border-r border-slate-200">Rule/Match</th>
-                  <th className="text-left p-2 font-medium text-slate-700 w-[15%] border-r border-slate-200">Account</th>
-                  <th className="text-left p-2 font-medium text-slate-700 w-[20%] border-r border-slate-200">ID</th>
-                  <th className="text-left p-2 font-medium text-slate-700 w-[15%]">Amount</th>
-                </tr>
-              </thead>
+          <div className="p-4">
+            <div className="border border-slate-200 rounded-lg overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                  {table.getHeaderGroups().map(headerGroup => (
+                    <tr key={headerGroup.id}>
+                      {headerGroup.headers.map((header, index, array) => (
+                        <th
+                          key={header.id}
+                          className={`text-left p-2 font-medium text-slate-700 ${
+                            index < array.length - 1 ? 'border-r border-slate-200' : ''
+                          }`}
+                          style={{ width: `${header.getSize()}px` }}
+                        >
+                          {header.isPlaceholder
+                            ? null
+                            : flexRender(header.column.columnDef.header, header.getContext())
+                          }
+                        </th>
+                      ))}
+                    </tr>
+                  ))}
+                </thead>
               <tbody>
-                {renderTableRows()}
+                {(() => {
+                  // Pre-calculate transaction groupings for efficient row coloring
+                  const allRows = table.getRowModel().rows;
+                  const transactionIds = [...new Set(allRows.map(r => r.original.transactionId).filter(Boolean))];
+
+                  return allRows.map((row, index) => {
+                    const { type, transactionId } = row.original;
+
+                    // Calculate background color based on payment grouping
+                    let backgroundClass;
+                    if (type === 'file') {
+                      backgroundClass = 'bg-white'; // Files get white background
+                    } else {
+                      const transactionIndex = transactionIds.indexOf(transactionId);
+                      const isEvenPayment = transactionIndex % 2 === 0;
+                      backgroundClass = isEvenPayment ? 'bg-slate-50' : 'bg-white';
+                    }
+
+                  return (
+                    <tr
+                      key={row.id}
+                      className={`border-b hover:bg-blue-50 hover:border-blue-200 transition-colors ${backgroundClass}`}
+                    >
+                      {row.getVisibleCells().map((cell, index, array) => (
+                        <td
+                          key={cell.id}
+                          className={`p-2 ${
+                            index < array.length - 1 ? 'border-r border-slate-200' : ''
+                          }`}
+                          style={{ width: `${cell.column.getSize()}px` }}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      ))}
+                    </tr>
+                    );
+                  });
+                })()}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         </div>
 
