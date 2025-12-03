@@ -315,7 +315,7 @@ const LockboxValidationScreen = () => {
     columnHelper.accessor('rule', {
       id: 'rule',
       header: 'Rule/Match',
-      size: 128,
+      size: 240,
       cell: ({ row }) => {
         const { type, data: itemData } = row.original;
 
@@ -363,21 +363,11 @@ const LockboxValidationScreen = () => {
         const { type, data: itemData } = row.original;
 
         if (type === 'file') {
-          return (
-            <div className="flex items-center space-x-2">
-              <FileText className="h-4 w-4 text-slate-600" />
-              <span className="text-sm font-medium text-slate-800">{itemData.fileName}</span>
-            </div>
-          );
+          return <span className="text-sm font-medium text-slate-800">{itemData.fileName}</span>;
         } else if (type === 'transaction') {
           return <span className="text-sm font-medium text-slate-800">{itemData.id.split('-')[1]}</span>;
         } else if (type === 'invoice') {
-          return (
-            <div className="flex items-center space-x-2">
-              <FileText className="h-4 w-4 text-green-600" />
-              <span className="text-sm font-medium text-slate-800">{itemData.invoiceNumber}</span>
-            </div>
-          );
+          return <span className="text-sm font-medium text-slate-800">{itemData.invoiceNumber}</span>;
         } else if (type === 'lineItem') {
           return <span className="text-sm text-slate-700">{itemData.description}</span>;
         } else if (type === 'unallocated') {
