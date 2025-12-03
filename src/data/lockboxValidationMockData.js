@@ -34,8 +34,8 @@ export const mockLockboxFiles = [
             status: 'proposed',
             expanded: false,
             lineItems: [
-              { id: 'line-001-1', description: 'Professional Services - Nov', amount: 300.00, status: 'proposed', matchDescription: 'payment amount matched line item amount' },
-              { id: 'line-001-2', description: 'Travel Expenses', amount: 200.00, status: 'proposed', matchDescription: 'payment less than line item amount but within write off threshold' }
+              { id: 'line-001-1', description: 'Professional Services - Nov', amount: 300.00, status: 'proposed', matchDescription: 'Payment amount matched line item amount' },
+              { id: 'line-001-2', description: 'Travel Expenses', amount: 200.00, status: 'proposed', matchDescription: 'Payment less than line item amount but within write off threshold' }
             ]
           },
           {
@@ -47,7 +47,7 @@ export const mockLockboxFiles = [
             status: 'proposed',
             expanded: false,
             lineItems: [
-              { id: 'line-015-1', description: 'Consulting Hours', amount: 300.00, status: 'proposed', matchDescription: 'payment amount matched line item amount' }
+              { id: 'line-015-1', description: 'Consulting Hours', amount: 300.00, status: 'proposed', matchDescription: 'Payment amount matched line item amount' }
             ]
           }
         ],
@@ -75,8 +75,8 @@ export const mockLockboxFiles = [
             status: 'valid',
             expanded: false,
             lineItems: [
-              { id: 'line-002-1', description: 'Software License', amount: 600.00, status: 'valid', matchDescription: 'payment amount matched line item amount' },
-              { id: 'line-002-2', description: 'Support Contract', amount: 200.00, status: 'valid', matchDescription: 'payment amount matched line item amount' }
+              { id: 'line-002-1', description: 'Software License', amount: 600.00, status: 'valid', matchDescription: 'Payment amount matched line item amount' },
+              { id: 'line-002-2', description: 'Support Contract', amount: 200.00, status: 'valid', matchDescription: 'Payment amount matched line item amount' }
             ]
           }
         ],
@@ -119,7 +119,7 @@ export const mockLockboxFiles = [
             status: 'valid',
             expanded: false,
             lineItems: [
-              { id: 'line-088-1', description: 'Monthly Subscription', amount: 975.00, status: 'valid', matchDescription: 'payment amount matched line item amount' }
+              { id: 'line-088-1', description: 'Monthly Subscription', amount: 975.00, status: 'valid', matchDescription: 'Payment amount matched line item amount' }
             ]
           }
         ],
@@ -147,8 +147,8 @@ export const mockLockboxFiles = [
             status: 'proposed',
             expanded: false,
             lineItems: [
-              { id: 'line-201-1', description: 'Product A', amount: 450.00, status: 'proposed', matchDescription: 'payment greater than line item amount - partial allocation' },
-              { id: 'line-201-2', description: 'Shipping', amount: 300.00, status: 'proposed', matchDescription: 'payment less than line item amount but within write off threshold' }
+              { id: 'line-201-1', description: 'Product A', amount: 450.00, status: 'proposed', matchDescription: 'Payment greater than line item amount - partial allocation' },
+              { id: 'line-201-2', description: 'Shipping', amount: 300.00, status: 'proposed', matchDescription: 'Payment less than line item amount but within write off threshold' }
             ]
           },
           {
@@ -160,7 +160,7 @@ export const mockLockboxFiles = [
             status: 'proposed',
             expanded: false,
             lineItems: [
-              { id: 'line-202-1', description: 'Product B', amount: 820.00, status: 'proposed', matchDescription: 'payment amount matched line item amount' }
+              { id: 'line-202-1', description: 'Product B', amount: 820.00, status: 'proposed', matchDescription: 'Payment amount matched line item amount' }
             ]
           },
           {
@@ -172,7 +172,7 @@ export const mockLockboxFiles = [
             status: 'proposed',
             expanded: false,
             lineItems: [
-              { id: 'line-203-1', description: 'Service Fee', amount: 400.00, status: 'proposed', matchDescription: 'payment greater than line item amount - partial allocation' }
+              { id: 'line-203-1', description: 'Service Fee', amount: 400.00, status: 'proposed', matchDescription: 'Payment greater than line item amount - partial allocation' }
             ]
           }
         ],

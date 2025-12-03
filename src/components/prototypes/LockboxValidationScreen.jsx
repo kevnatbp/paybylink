@@ -185,21 +185,77 @@ const LockboxValidationScreen = () => {
 
   // Render action buttons for each row type
   const renderActions = (type, item, fileId, transactionId = null, invoiceId = null) => {
-    if (type === 'file') return null;
+    if (type === 'file') {
+      // Check if all transactions in this file are valid with no issues
+      const canPost = item.transactions.every(txn =>
+        txn.status === 'valid' &&
+        txn.issues.length === 0 &&
+        txn.unallocatedAmount === 0
+      );
 
+      return (
+        <div className="flex space-x-1 justify-center">
+          <button
+            disabled={!canPost}
+            className={`p-1 border rounded text-xs transition-colors w-6 h-6 flex items-center justify-center ${
+              canPost
+                ? 'border-slate-300 text-slate-600 hover:bg-green-100 hover:border-green-300'
+                : 'border-slate-200 text-slate-400 cursor-not-allowed bg-slate-50'
+            }`}
+            title={canPost ? "Post File" : "Resolve all issues to post"}
+          >
+            📮
+          </button>
+        </div>
+      );
+    }
+
+    if (type === 'transaction') {
+      const needsReview = item.status === 'needs_review' || item.issues.length > 0;
+
+      return (
+        <div className="flex space-x-1 justify-center">
+          {needsReview ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedItem({ type: 'transaction', item, fileId, transactionId });
+                setShowCorrectionModal(true);
+              }}
+              className="p-1 border border-slate-300 text-slate-600 rounded text-xs hover:bg-blue-100 hover:border-blue-300 transition-colors w-6 h-6 flex items-center justify-center"
+              title="Review"
+            >
+              🔍
+            </button>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                updateItemStatus('transaction', fileId, transactionId, null, null, 'approved');
+              }}
+              className="p-1 border border-slate-300 text-slate-600 rounded text-xs hover:bg-green-100 hover:border-green-300 transition-colors w-6 h-6 flex items-center justify-center"
+              title="Approve"
+            >
+              ✓
+            </button>
+          )}
+        </div>
+      );
+    }
 
     if (type === 'invoice') {
       return (
-        <div className="flex min-w-[140px] justify-center">
+        <div className="flex space-x-1 justify-center">
           <button
             onClick={(e) => {
               e.stopPropagation();
               setSelectedItem({ type: 'invoice', item, fileId, transactionId, invoiceId });
               setShowCorrectionModal(true);
             }}
-            className="px-2 py-1 border border-slate-300 text-slate-600 rounded text-xs hover:bg-yellow-100 hover:border-yellow-300 transition-colors w-16"
+            className="p-1 border border-slate-300 text-slate-600 rounded text-xs hover:bg-yellow-100 hover:border-yellow-300 transition-colors w-6 h-6 flex items-center justify-center"
+            title="Edit"
           >
-            ✏️ Edit
+            ✏️
           </button>
         </div>
       );
@@ -220,7 +276,10 @@ const LockboxValidationScreen = () => {
       // File row
       rows.push(
         <tr key={file.id} className={`border-b hover:bg-blue-50 hover:border-blue-200 transition-colors ${isEvenRow ? 'bg-slate-50' : 'bg-white'}`}>
-          <td className="p-2">
+          <td className="p-2 border-r border-slate-200">
+            {renderActions('file', file, file.id)}
+          </td>
+          <td className="p-2 border-r border-slate-200">
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => toggleExpanded('file', file.id)}
@@ -231,24 +290,21 @@ const LockboxValidationScreen = () => {
               <span className="text-xs text-slate-500 border border-slate-200 px-2 py-1 rounded">File</span>
             </div>
           </td>
-          <td className="p-2 text-sm text-slate-600">-</td>
-          <td className="p-2">
+          <td className="p-2 border-r border-slate-200">
+            <span className="inline-flex items-center space-x-1 text-xs text-orange-700 bg-orange-100 border border-orange-200 px-2 py-1 rounded-full">
+              <AlertTriangle className="h-3 w-3" />
+              <span>Not Posted</span>
+            </span>
+          </td>
+          <td className="p-2 text-xs text-slate-500 border-r border-slate-200">Lockbox file uploaded</td>
+          <td className="p-2 text-xs text-slate-600 border-r border-slate-200">-</td>
+          <td className="p-2 border-r border-slate-200">
             <div className="flex items-center space-x-2">
               <FileText className="h-4 w-4 text-slate-600" />
-              <span className="font-medium text-slate-800">{file.fileName}</span>
+              <span className="text-sm font-medium text-slate-800">{file.fileName}</span>
             </div>
           </td>
           <td className="p-2 text-sm font-medium text-slate-800">{formatCurrency(file.totalAmount)}</td>
-          <td className="p-2">
-            <div>
-              <span className={`inline-flex items-center space-x-1 text-xs ${fileStatus.color}`}>
-                {fileStatus.icon}
-                <span>{fileStatus.label}</span>
-              </span>
-              <div className="text-xs text-slate-500 mt-1">Lockbox file uploaded</div>
-            </div>
-          </td>
-          <td className="p-2"></td>
         </tr>
       );
       rowIndex++;
@@ -262,7 +318,10 @@ const LockboxValidationScreen = () => {
 
           rows.push(
             <tr key={txn.id} className={`border-b hover:bg-blue-50 hover:border-blue-200 transition-colors ${isEvenRow ? 'bg-slate-50' : 'bg-white'}`}>
-              <td className="p-2 pl-8">
+              <td className="p-2 border-r border-slate-200">
+                {renderActions('transaction', txn, file.id, txn.id)}
+              </td>
+              <td className="p-2 pl-8 border-r border-slate-200">
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={() => toggleExpanded('transaction', file.id, txn.id)}
@@ -273,26 +332,20 @@ const LockboxValidationScreen = () => {
                   <span className="text-xs text-slate-500 border border-slate-200 px-2 py-1 rounded">Payment</span>
                 </div>
               </td>
-              <td className="p-2 text-sm text-slate-600">{txn.otherParty}</td>
-              <td className="p-2">
-                <span className="font-medium text-slate-800">{txn.id.split('-')[1]}</span>
+              <td className="p-2 border-r border-slate-200">
+                <span className={`inline-flex items-center space-x-1 text-xs ${txnStatus.color}`}>
+                  {txnStatus.icon}
+                  <span>{txnStatus.label}</span>
+                </span>
+              </td>
+              <td className="p-2 text-xs text-slate-500 border-r border-slate-200">
+                {txn.ruleApplied ? ruleInfo : 'No rules matched'}
+              </td>
+              <td className="p-2 text-xs text-slate-600 border-r border-slate-200">{txn.otherParty}</td>
+              <td className="p-2 border-r border-slate-200">
+                <span className="text-sm font-medium text-slate-800">{txn.id.split('-')[1]}</span>
               </td>
               <td className="p-2 text-sm font-medium text-slate-800">{formatCurrency(txn.amount)}</td>
-              <td className="p-2">
-                <div>
-                  <span className={`inline-flex items-center space-x-1 text-xs ${txnStatus.color}`}>
-                    {txnStatus.icon}
-                    <span>{txnStatus.label}</span>
-                  </span>
-                  <div className="text-xs text-slate-500 mt-1">
-                    {txn.ruleApplied ? ruleInfo : 'No rules matched'}
-                    {txn.issues.length > 0 && ` • ${txn.issues.length} issue(s)`}
-                  </div>
-                </div>
-              </td>
-              <td className="p-2">
-                {renderActions('transaction', txn, file.id, txn.id)}
-              </td>
             </tr>
           );
           rowIndex++;
@@ -305,7 +358,10 @@ const LockboxValidationScreen = () => {
 
               rows.push(
                 <tr key={invoice.id} className={`border-b hover:bg-blue-50 hover:border-blue-200 transition-colors ${isEvenRow ? 'bg-slate-50' : 'bg-white'}`}>
-                  <td className="p-2 pl-12">
+                  <td className="p-2 border-r border-slate-200">
+                    {renderActions('invoice', invoice, file.id, txn.id, invoice.id)}
+                  </td>
+                  <td className="p-2 pl-12 border-r border-slate-200">
                     <div className="flex items-center space-x-2">
                       <button
                         onClick={() => toggleExpanded('invoice', file.id, txn.id, invoice.id)}
@@ -316,26 +372,21 @@ const LockboxValidationScreen = () => {
                       <span className="text-xs text-slate-500 border border-slate-200 px-2 py-1 rounded">Invoice</span>
                     </div>
                   </td>
-                  <td className="p-2 text-sm text-slate-600">{invoice.customerName}</td>
-                  <td className="p-2">
+                  <td className="p-2 border-r border-slate-200">
+                    <span className={`inline-flex items-center space-x-1 text-xs ${invStatus.color}`}>
+                      {invStatus.icon}
+                      <span>{invStatus.label}</span>
+                    </span>
+                  </td>
+                  <td className="p-2 text-xs text-slate-500 border-r border-slate-200">Invoice allocation</td>
+                  <td className="p-2 text-xs text-slate-600 border-r border-slate-200">{invoice.customerName}</td>
+                  <td className="p-2 border-r border-slate-200">
                     <div className="flex items-center space-x-2">
                       <FileText className="h-4 w-4 text-green-600" />
-                      <span className="font-medium text-slate-800">{invoice.invoiceNumber}</span>
+                      <span className="text-sm font-medium text-slate-800">{invoice.invoiceNumber}</span>
                     </div>
                   </td>
                   <td className="p-2 text-sm font-medium text-slate-800">{formatCurrency(invoice.proposedAmount)}</td>
-                  <td className="p-2">
-                    <div>
-                      <span className={`inline-flex items-center space-x-1 text-xs ${invStatus.color}`}>
-                        {invStatus.icon}
-                        <span>{invStatus.label}</span>
-                      </span>
-                      <div className="text-xs text-slate-500 mt-1">Invoice allocation</div>
-                    </div>
-                  </td>
-                  <td className="p-2">
-                    {renderActions('invoice', invoice, file.id, txn.id, invoice.id)}
-                  </td>
                 </tr>
               );
               rowIndex++;
@@ -348,27 +399,25 @@ const LockboxValidationScreen = () => {
 
                   rows.push(
                     <tr key={lineItem.id} className={`border-b hover:bg-blue-50 hover:border-blue-200 transition-colors ${isEvenRow ? 'bg-slate-50' : 'bg-white'}`}>
-                      <td className="p-2 pl-16">
+                      <td className="p-2 border-r border-slate-200"></td>
+                      <td className="p-2 pl-16 border-r border-slate-200">
                         <div className="flex items-center space-x-2">
                           <div className="w-4 h-4"></div>
                           <span className="text-xs text-slate-500 border border-slate-200 px-2 py-1 rounded whitespace-nowrap">Item</span>
                         </div>
                       </td>
-                      <td className="p-2 text-sm text-slate-600">-</td>
-                      <td className="p-2">
+                      <td className="p-2 border-r border-slate-200">
+                        <span className={`inline-flex items-center space-x-1 text-xs ${lineStatus.color}`}>
+                          {lineStatus.icon}
+                          <span>{lineStatus.label}</span>
+                        </span>
+                      </td>
+                      <td className="p-2 text-xs text-slate-500 border-r border-slate-200">{lineItem.matchDescription || 'No match description'}</td>
+                      <td className="p-2 text-xs text-slate-600 border-r border-slate-200">-</td>
+                      <td className="p-2 border-r border-slate-200">
                         <span className="text-sm text-slate-700">{lineItem.description}</span>
                       </td>
                       <td className="p-2 text-sm font-medium text-slate-800">{formatCurrency(lineItem.amount)}</td>
-                      <td className="p-2">
-                        <div>
-                          <span className={`inline-flex items-center space-x-1 text-xs ${lineStatus.color}`}>
-                            {lineStatus.icon}
-                            <span>{lineStatus.label}</span>
-                          </span>
-                          <div className="text-xs text-slate-500 mt-1">{lineItem.matchDescription || 'No match description'}</div>
-                        </div>
-                      </td>
-                      <td className="p-2"></td>
                     </tr>
                   );
                   rowIndex++;
@@ -381,42 +430,41 @@ const LockboxValidationScreen = () => {
               const isEvenRow = rowIndex % 2 === 0;
               rows.push(
                 <tr key={`${txn.id}-unallocated`} className={`border-b hover:bg-blue-50 hover:border-blue-200 transition-colors ${isEvenRow ? 'bg-slate-50' : 'bg-white'}`}>
-                  <td className="p-2 pl-12">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-4 h-4"></div>
-                      <span className="text-xs text-slate-500 border border-slate-200 px-2 py-1 rounded">Unallocated</span>
-                    </div>
-                  </td>
-                  <td className="p-2 text-sm text-slate-600">-</td>
-                  <td className="p-2">
-                    <div className="flex items-center space-x-2">
-                      <AlertTriangle className="h-4 w-4 text-orange-600" />
-                      <span className="font-medium text-orange-800">Unallocated Amount</span>
-                    </div>
-                  </td>
-                  <td className="p-2 text-sm font-medium text-orange-600">{formatCurrency(txn.unallocatedAmount)}</td>
-                  <td className="p-2">
-                    <div>
-                      <span className="inline-flex items-center space-x-1 text-xs text-slate-700">
-                        <AlertTriangle className="h-3 w-3" />
-                        <span>Needs Review</span>
-                      </span>
-                      <div className="text-xs text-slate-500 mt-1">Manual assignment needed</div>
-                    </div>
-                  </td>
-                  <td className="p-2">
-                    <div className="flex min-w-[140px] justify-center">
+                  <td className="p-2 border-r border-slate-200">
+                    <div className="flex space-x-1 justify-center">
                       <button
                         onClick={() => {
                           setSelectedItem({ type: 'unallocated', item: txn, fileId: file.id, transactionId: txn.id });
                           setShowCorrectionModal(true);
                         }}
-                        className="px-2 py-1 border border-slate-300 text-slate-600 rounded text-xs hover:bg-yellow-100 hover:border-yellow-300 transition-colors w-16"
+                        className="p-1 border border-slate-300 text-slate-600 rounded text-xs hover:bg-yellow-100 hover:border-yellow-300 transition-colors w-6 h-6 flex items-center justify-center"
+                        title="Edit"
                       >
-                        ✏️ Edit
+                        ✏️
                       </button>
                     </div>
                   </td>
+                  <td className="p-2 pl-12 border-r border-slate-200">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-4 h-4"></div>
+                      <span className="text-xs text-slate-500 border border-slate-200 px-2 py-1 rounded">Unallocated</span>
+                    </div>
+                  </td>
+                  <td className="p-2 border-r border-slate-200">
+                    <span className="inline-flex items-center space-x-1 text-xs text-slate-700 bg-slate-100 border border-slate-200 px-2 py-1 rounded-full">
+                      <AlertTriangle className="h-3 w-3" />
+                      <span>Needs Review</span>
+                    </span>
+                  </td>
+                  <td className="p-2 text-xs text-slate-500 border-r border-slate-200">Manual assignment needed</td>
+                  <td className="p-2 text-xs text-slate-600 border-r border-slate-200">-</td>
+                  <td className="p-2 border-r border-slate-200">
+                    <div className="flex items-center space-x-2">
+                      <AlertTriangle className="h-4 w-4 text-orange-600" />
+                      <span className="text-sm font-medium text-orange-800">Unallocated Amount</span>
+                    </div>
+                  </td>
+                  <td className="p-2 text-sm font-medium text-orange-600">{formatCurrency(txn.unallocatedAmount)}</td>
                 </tr>
               );
               rowIndex++;
@@ -536,53 +584,31 @@ const LockboxValidationScreen = () => {
       {/* MAIN CONTENT */}
       <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
 
-        {/* SUMMARY STATS - COMMENTED OUT FOR NOW */}
-        {/*
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white border rounded-lg shadow-sm p-4">
-            <div className="flex items-center space-x-3">
-              <FileText className="h-8 w-8 text-slate-500" />
-              <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide">Files</p>
-                <p className="text-2xl font-bold text-slate-800">{stats.totalFiles}</p>
-              </div>
+        {/* SUMMARY STATS */}
+        <div className="bg-white border rounded-lg shadow-sm p-4">
+          <div className="grid grid-cols-5 gap-6">
+            <div className="text-center">
+              <span className="text-xs text-slate-500 border border-slate-200 px-2 py-1 rounded mb-2 inline-block">Files</span>
+              <p className="text-lg font-bold text-slate-800">{stats.totalFiles}</p>
             </div>
-          </div>
-
-          <div className="bg-white border rounded-lg shadow-sm p-4">
-            <div className="flex items-center space-x-3">
-              <DollarSign className="h-8 w-8 text-blue-500" />
-              <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide">Transactions</p>
-                <p className="text-2xl font-bold text-slate-800">{stats.totalTransactions}</p>
-                <p className="text-xs text-slate-400">{formatCurrency(stats.totalAmount)}</p>
-              </div>
+            <div className="text-center">
+              <span className="text-xs text-slate-500 border border-slate-200 px-2 py-1 rounded mb-2 inline-block">Payments</span>
+              <p className="text-lg font-bold text-slate-800">{stats.totalTransactions}</p>
             </div>
-          </div>
-
-          <div className="bg-white border rounded-lg shadow-sm p-4">
-            <div className="flex items-center space-x-3">
-              <CheckCircle className="h-8 w-8 text-green-500" />
-              <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide">Valid</p>
-                <p className="text-2xl font-bold text-green-600">{stats.valid}</p>
-                <p className="text-xs text-slate-400">Ready to post</p>
-              </div>
+            <div className="text-center">
+              <span className="text-xs text-slate-500 border border-slate-200 px-2 py-1 rounded mb-2 inline-block">Total Volume</span>
+              <p className="text-lg font-bold text-blue-600">{formatCurrency(stats.totalAmount)}</p>
             </div>
-          </div>
-
-          <div className="bg-white border rounded-lg shadow-sm p-4">
-            <div className="flex items-center space-x-3">
-              <AlertTriangle className="h-8 w-8 text-orange-500" />
-              <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide">Needs Review</p>
-                <p className="text-2xl font-bold text-orange-600">{stats.needsReview}</p>
-                <p className="text-xs text-slate-400">Requires attention</p>
-              </div>
+            <div className="text-center">
+              <span className="text-xs text-slate-500 border border-slate-200 px-2 py-1 rounded mb-2 inline-block">Matched</span>
+              <p className="text-lg font-bold text-green-600">{stats.valid}</p>
+            </div>
+            <div className="text-center">
+              <span className="text-xs text-slate-500 border border-slate-200 px-2 py-1 rounded mb-2 inline-block">Review Required</span>
+              <p className="text-lg font-bold text-orange-600">{stats.needsReview}</p>
             </div>
           </div>
         </div>
-        */}
 
         {/* CONSOLIDATED TABLE */}
         <div className="bg-white border rounded-lg shadow-sm">
@@ -610,12 +636,13 @@ const LockboxValidationScreen = () => {
             <table className="w-full">
               <thead className="bg-slate-50 border-b">
                 <tr>
-                  <th className="text-left p-2 font-medium text-slate-700 w-[10%]">Type</th>
-                  <th className="text-left p-2 font-medium text-slate-700 w-[17%]">Account</th>
-                  <th className="text-left p-2 font-medium text-slate-700 w-[23%]">ID</th>
-                  <th className="text-left p-2 font-medium text-slate-700 w-[12%]">Amount</th>
-                  <th className="text-left p-2 font-medium text-slate-700 w-[23%]">Status</th>
-                  <th className="text-center p-2 font-medium text-slate-700 w-[15%]">Action</th>
+                  <th className="text-center p-2 font-medium text-slate-700 w-[8%] border-r border-slate-200">Action</th>
+                  <th className="text-left p-2 font-medium text-slate-700 w-[8%] border-r border-slate-200">Type</th>
+                  <th className="text-left p-2 font-medium text-slate-700 w-[17%] border-r border-slate-200">Allocation Status</th>
+                  <th className="text-left p-2 font-medium text-slate-700 w-[17%] border-r border-slate-200">Rule/Match</th>
+                  <th className="text-left p-2 font-medium text-slate-700 w-[15%] border-r border-slate-200">Account</th>
+                  <th className="text-left p-2 font-medium text-slate-700 w-[20%] border-r border-slate-200">ID</th>
+                  <th className="text-left p-2 font-medium text-slate-700 w-[15%]">Amount</th>
                 </tr>
               </thead>
               <tbody>
