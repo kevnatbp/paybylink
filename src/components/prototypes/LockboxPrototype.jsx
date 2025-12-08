@@ -1,9 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Upload, Search, FileText, Settings, ListChecks, X,
   AlertCircle, CheckCircle, TrendingUp,
-  DollarSign, FileCheck, AlertTriangle
+  DollarSign, FileCheck, AlertTriangle,
+  ChevronDown, ChevronRight
 } from 'lucide-react';
+import {
+  useReactTable,
+  getCoreRowModel,
+  getExpandedRowModel,
+  flexRender,
+  createColumnHelper
+} from '@tanstack/react-table';
 import {
   mockFiles,
   mockBatches,
@@ -11,12 +19,16 @@ import {
   mockRules,
   mockAllocations
 } from '../../data/cashAppMockData';
+import LockboxValidationScreen from './LockboxValidationScreen';
+
+const columnHelper = createColumnHelper();
 
 const LockboxPrototype = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [onlyUncompleted, setOnlyUncompleted] = useState(false);
-  
+  const [expanded, setExpanded] = useState({});
+
   // Configuration flags for modular sections
   const [hasLockboxConfig, setHasLockboxConfig] = useState(true);
   const [hasCashAppConfig, setHasCashAppConfig] = useState(true);
@@ -62,8 +74,341 @@ const LockboxPrototype = () => {
     ? Math.round((allocatedTransactions / allTransactions.length) * 100)
     : 0;
 
-  // Get exceptions (unreconciled transactions)
-  const exceptions = allTransactions.filter(t => t.remaining > 0);
+  // Transform transactions to hierarchical format for TanStack Table
+  const flattenTransactionData = (transactions) => {
+    const flattened = [];
+
+    transactions.forEach(txn => {
+      // Add main transaction row
+      flattened.push({
+        id: txn.id,
+        type: 'transaction',
+        level: 0,
+        data: txn,
+        parentId: null
+      });
+
+      // Add allocation rows if expanded
+      if (txn.allocations && txn.allocations.length > 0) {
+        txn.allocations.forEach(allocId => {
+          const allocation = mockAllocations[allocId];
+          if (allocation) {
+            flattened.push({
+              id: `${txn.id}-${allocation.id}`,
+              type: 'allocation',
+              level: 1,
+              data: allocation,
+              parentId: txn.id
+            });
+          }
+        });
+      }
+
+      // Add rules if expanded
+      if (txn.rulesApplied && txn.rulesApplied.length > 0) {
+        txn.rulesApplied.forEach(ruleId => {
+          const rule = mockRules[ruleId];
+          if (rule) {
+            flattened.push({
+              id: `${txn.id}-${rule.id}`,
+              type: 'rule',
+              level: 1,
+              data: rule,
+              parentId: txn.id
+            });
+          }
+        });
+      }
+    });
+
+    return flattened;
+  };
+
+  // Prepare data for TanStack Table
+  const tableData = useMemo(() =>
+    flattenTransactionData(transactions),
+    [transactions]
+  );
+
+  // Status display function
+  const getStatusDisplay = (status, remaining) => {
+    if (remaining === 0) {
+      return {
+        color: 'text-green-700 bg-green-100 border border-green-200 px-2 py-1 rounded-full',
+        icon: <CheckCircle className="h-3 w-3" />,
+        label: 'Fully Allocated'
+      };
+    } else if (remaining > 0 && remaining < status.amount) {
+      return {
+        color: 'text-yellow-700 bg-yellow-100 border border-yellow-200 px-2 py-1 rounded-full',
+        icon: <AlertTriangle className="h-3 w-3" />,
+        label: 'Partially Allocated'
+      };
+    } else {
+      return {
+        color: 'text-slate-700 bg-slate-100 border border-slate-200 px-2 py-1 rounded-full',
+        icon: <AlertCircle className="h-3 w-3" />,
+        label: 'Unallocated'
+      };
+    }
+  };
+
+  // Toggle expand/collapse for transactions
+  const toggleTransactionExpanded = (transactionId) => {
+    setExpanded(prev => ({
+      ...prev,
+      [transactionId]: !prev[transactionId]
+    }));
+  };
+
+  // Define columns for TanStack Table
+  const columns = useMemo(() => [
+    columnHelper.accessor('checkbox', {
+      id: 'checkbox',
+      header: '',
+      size: 40,
+      enableSorting: false,
+      cell: ({ row }) => {
+        const { type, data: itemData } = row.original;
+
+        if (type === 'transaction') {
+          return (
+            <input
+              type="checkbox"
+              checked={itemData.skip}
+              readOnly
+              className="rounded"
+            />
+          );
+        }
+
+        return null;
+      }
+    }),
+
+    columnHelper.accessor('type', {
+      id: 'type',
+      header: 'Type',
+      size: 120,
+      enableSorting: false,
+      cell: ({ row }) => {
+        const { type, level, data: itemData } = row.original;
+        const paddingLeft = level * 24 + 8;
+
+        if (type === 'transaction') {
+          const canExpand = (itemData.allocations?.length > 0 || itemData.rulesApplied?.length > 0);
+
+          return (
+            <div className="flex items-center space-x-2" style={{ paddingLeft: `${paddingLeft}px` }}>
+              {canExpand ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleTransactionExpanded(itemData.id);
+                  }}
+                  className="text-slate-500 hover:text-slate-700"
+                >
+                  {expanded[itemData.id] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </button>
+              ) : (
+                <div className="w-4 h-4"></div>
+              )}
+              <span className="text-sm font-medium text-slate-800">Transaction</span>
+            </div>
+          );
+        } else if (type === 'allocation') {
+          return (
+            <div className="flex items-center space-x-2" style={{ paddingLeft: `${paddingLeft}px` }}>
+              <div className="w-4 h-4"></div>
+              <span className="text-xs text-slate-500 border border-slate-200 px-2 py-1 rounded whitespace-nowrap">
+                Allocation
+              </span>
+            </div>
+          );
+        } else if (type === 'rule') {
+          return (
+            <div className="flex items-center space-x-2" style={{ paddingLeft: `${paddingLeft}px` }}>
+              <div className="w-4 h-4"></div>
+              <span className="text-xs text-slate-500 border border-slate-200 px-2 py-1 rounded whitespace-nowrap">
+                Rule
+              </span>
+            </div>
+          );
+        }
+
+        return null;
+      }
+    }),
+
+    columnHelper.accessor('date', {
+      id: 'date',
+      header: 'Date',
+      size: 100,
+      cell: ({ row }) => {
+        const { type, data: itemData } = row.original;
+
+        if (type === 'transaction') {
+          return <span className="text-sm text-slate-600">{formatDate(itemData.date)}</span>;
+        } else if (type === 'allocation') {
+          return <span className="text-xs text-slate-500">{formatDateTime(itemData.allocatedOn)}</span>;
+        } else if (type === 'rule') {
+          return <span className="text-xs text-slate-500">{formatDateTime(itemData.createdOn)}</span>;
+        }
+
+        return null;
+      }
+    }),
+
+    columnHelper.accessor('description', {
+      id: 'description',
+      header: 'Description',
+      size: 200,
+      cell: ({ row }) => {
+        const { type, data: itemData } = row.original;
+
+        if (type === 'transaction') {
+          return <span className="text-sm font-medium text-slate-800">{itemData.otherParty}</span>;
+        } else if (type === 'allocation') {
+          return (
+            <div>
+              <span className="text-xs text-slate-600">{itemData.customerName}</span>
+              <br />
+              <span className="text-xs text-slate-500">Invoice: {itemData.invoiceNumber}</span>
+            </div>
+          );
+        } else if (type === 'rule') {
+          return <span className="text-xs text-slate-600">{itemData.name}</span>;
+        }
+
+        return null;
+      }
+    }),
+
+    columnHelper.accessor('amount', {
+      id: 'amount',
+      header: 'Amount',
+      size: 120,
+      cell: ({ row }) => {
+        const { type, data: itemData } = row.original;
+
+        if (type === 'transaction') {
+          return <span className="text-sm font-medium text-slate-800">{formatCurrency(itemData.amount)}</span>;
+        } else if (type === 'allocation') {
+          return <span className="text-sm font-medium text-green-600">{formatCurrency(itemData.allocatedAmount)}</span>;
+        }
+
+        return null;
+      }
+    }),
+
+    columnHelper.accessor('remaining', {
+      id: 'remaining',
+      header: 'Remaining',
+      size: 120,
+      cell: ({ row }) => {
+        const { type, data: itemData } = row.original;
+
+        if (type === 'transaction') {
+          return (
+            <span className={`text-sm font-medium ${itemData.remaining > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+              {formatCurrency(itemData.remaining)}
+            </span>
+          );
+        }
+
+        return null;
+      }
+    }),
+
+    columnHelper.accessor('matchStatus', {
+      id: 'matchStatus',
+      header: 'Match Status',
+      size: 120,
+      cell: ({ row }) => {
+        const { type, data: itemData } = row.original;
+
+        if (type === 'transaction') {
+          return (
+            itemData.rulesApplied && itemData.rulesApplied.length > 0 ? (
+              <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                Matched
+              </span>
+            ) : (
+              <span className="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                No Match
+              </span>
+            )
+          );
+        }
+
+        return null;
+      }
+    }),
+
+    columnHelper.accessor('allocationStatus', {
+      id: 'allocationStatus',
+      header: 'Allocation Status',
+      size: 150,
+      cell: ({ row }) => {
+        const { type, data: itemData } = row.original;
+
+        if (type === 'transaction') {
+          if (itemData.remaining === 0) {
+            return (
+              <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                Fully Allocated
+              </span>
+            );
+          } else if (itemData.allocations.length > 0) {
+            return (
+              <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
+                Partially Allocated
+              </span>
+            );
+          } else {
+            return (
+              <span className="px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+                Unallocated
+              </span>
+            );
+          }
+        } else if (type === 'allocation') {
+          return (
+            <span className="inline-flex items-center space-x-1 text-xs text-green-700 bg-green-100 border border-green-200 px-2 py-1 rounded-full">
+              <CheckCircle className="h-3 w-3" />
+              <span>{itemData.allocationType}</span>
+            </span>
+          );
+        } else if (type === 'rule') {
+          return (
+            <span className="inline-flex items-center space-x-1 text-xs text-blue-700 bg-blue-100 border border-blue-200 px-2 py-1 rounded-full">
+              <Settings className="h-3 w-3" />
+              <span>Priority {itemData.priority}</span>
+            </span>
+          );
+        }
+
+        return null;
+      }
+    })
+  ], [transactions, expanded]);
+
+  // Create TanStack Table instance
+  const table = useReactTable({
+    data: tableData,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getExpandedRowModel: getExpandedRowModel(),
+    enableSorting: false,
+    enableExpanding: true,
+    getRowCanExpand: (row) => {
+      const { type, data: itemData } = row.original;
+      return type === 'transaction' &&
+        (itemData.allocations?.length > 0 || itemData.rulesApplied?.length > 0);
+    },
+    state: { expanded },
+    onExpandedChange: setExpanded
+  });
 
   const filteredFiles = mockFiles.filter(file => {
     if (onlyUncompleted && file.numberToProcess === 0) return false;
@@ -134,21 +479,21 @@ const LockboxPrototype = () => {
           <div className="bg-white border rounded-lg shadow-sm p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide">Requires Attention</p>
-                <p className="text-2xl font-bold text-orange-600 mt-1">{totalToProcess}</p>
-                <p className="text-xs text-slate-400 mt-1">{exceptions.length} unreconciled</p>
+                <p className="text-xs text-slate-500 uppercase tracking-wide">Total Transactions</p>
+                <p className="text-2xl font-bold text-blue-600 mt-1">{allTransactions.length}</p>
+                <p className="text-xs text-slate-400 mt-1">All editable</p>
               </div>
-              <AlertCircle className="h-8 w-8 text-orange-500" />
+              <ListChecks className="h-8 w-8 text-blue-500" />
             </div>
           </div>
         </div>
 
-        {/* 2-COLUMN LAYOUT: LEFT (Import/Search/Files) + RIGHT (Actions Required) */}
+        {/* FILE MANAGEMENT SECTION - 2 Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* LEFT COLUMN: Import, Search, Files */}
-          <div className="flex flex-col space-y-4 h-full">
+          {/* LEFT COLUMN: Import and Search Controls */}
+          <div className="flex flex-col space-y-4">
             {/* Import Controls */}
-            <div className="bg-white border rounded-lg shadow-sm p-4 flex-shrink-0">
+            <div className="bg-white border rounded-lg shadow-sm p-4">
               <div className="flex items-center gap-3">
                 <p className="text-sm font-semibold text-slate-700 whitespace-nowrap">Import File</p>
                 <input
@@ -164,7 +509,7 @@ const LockboxPrototype = () => {
             </div>
 
             {/* Search Controls */}
-            <div className="bg-white border rounded-lg shadow-sm p-4 space-y-2 flex-shrink-0">
+            <div className="bg-white border rounded-lg shadow-sm p-4 space-y-2">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-semibold text-slate-700 whitespace-nowrap">Search Files</p>
                 <div className="flex items-center gap-2 flex-1">
@@ -191,212 +536,55 @@ const LockboxPrototype = () => {
                 </label>
               </div>
             </div>
-
-            {/* FILES SECTION */}
-            <div className="bg-white border rounded-lg shadow-sm p-4 flex-1 flex flex-col min-h-0">
-              <h2 className="text-lg font-semibold text-slate-800 mb-3 flex-shrink-0">Files</h2>
-              <div className="border rounded-lg overflow-hidden flex-1 flex flex-col min-h-0">
-                <div className="overflow-y-auto flex-1">
-                  <table className="w-full text-xs">
-                    <thead className="bg-slate-50 sticky top-0 z-10">
-                      <tr className="border-b">
-                        <th className="text-left p-2 font-medium text-slate-700">Date Range</th>
-                        <th className="text-right p-2 font-medium text-slate-700">Trans.</th>
-                        <th className="text-right p-2 font-medium text-slate-700">Amount</th>
-                        <th className="text-right p-2 font-medium text-slate-700">To Process</th>
-                        <th className="text-center p-2 font-medium text-slate-700">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredFiles.map((file) => {
-                        const status = getFileStatus(file);
-                        return (
-                          <tr
-                            key={file.id}
-                            onClick={() => setSelectedFile(file)}
-                            className={`border-b cursor-pointer hover:bg-slate-50 transition-colors ${
-                              selectedFile?.id === file.id ? 'bg-blue-50' : ''
-                            }`}
-                          >
-                            <td className="p-2 whitespace-nowrap">{formatDate(file.dateFrom)}</td>
-                            <td className="text-right p-2">{file.totalTransactions.toLocaleString()}</td>
-                            <td className="text-right p-2">{formatCurrency(file.totalAmount)}</td>
-                            <td className="text-right p-2 font-medium">{file.numberToProcess}</td>
-                            <td className="text-center p-2">
-                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${status.color}`}>
-                                {status.label}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
           </div>
 
-          {/* RIGHT COLUMN: Actions Required */}
-          <div className="lg:sticky lg:top-6 lg:self-start flex flex-col h-full">
-            {exceptions.length > 0 && (
-              <div className="bg-white border border-orange-200 rounded-lg shadow-sm p-4 flex-1 flex flex-col min-h-0">
-                <h2 className="text-lg font-semibold text-slate-800 mb-3 flex-shrink-0">Action Required</h2>
-                <div className="border rounded-lg overflow-hidden flex-1 flex flex-col min-h-0">
-                  <div className="overflow-y-auto flex-1">
-                    <table className="w-full text-xs">
-                      <thead className="bg-orange-100 sticky top-0 z-10">
-                        <tr className="border-b border-orange-200">
-                          <th className="text-left p-2 font-medium text-slate-700">Date</th>
-                          <th className="text-left p-2 font-medium text-slate-700">Other Party</th>
-                          <th className="text-right p-2 font-medium text-slate-700">Amount</th>
-                          <th className="text-right p-2 font-medium text-slate-700">Remaining</th>
-                          <th className="text-left p-2 font-medium text-slate-700">Reason</th>
-                          <th className="text-center p-2 font-medium text-slate-700">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white">
-                        {exceptions.map((txn) => {
-                          const fileForTxn = Object.entries(mockTransactionsByFile).find(([_, txns]) =>
-                            txns.some(t => t.id === txn.id)
-                          );
-
-                          return (
-                            <tr
-                              key={txn.id}
-                              className="border-b border-orange-200 hover:bg-orange-50 transition-colors"
-                            >
-                              <td className="p-2 whitespace-nowrap">{formatDate(txn.date)}</td>
-                              <td className="p-2">
-                                <span className="font-medium text-slate-700 truncate block max-w-[120px]" title={txn.otherParty}>
-                                  {txn.otherParty}
-                                </span>
-                              </td>
-                              <td className="text-right p-2 font-medium text-slate-700">{formatCurrency(txn.amount)}</td>
-                              <td className="text-right p-2 font-medium text-orange-600">{formatCurrency(txn.remaining)}</td>
-                              <td className="p-2 text-slate-700">
-                                {txn.rulesApplied.length === 0 ? 'No rules matched' : 'Partial allocation'}
-                              </td>
-                              <td className="p-2 text-center">
-                                <button
-                                  onClick={() => {
-                                    if (fileForTxn) {
-                                      const file = mockFiles.find(f => f.id === fileForTxn[0]);
-                                      setSelectedFile(file);
-                                      setSelectedTransaction(txn);
-                                    }
-                                  }}
-                                  className="px-3 py-1.5 bg-orange-600 text-white rounded-md text-xs font-medium hover:bg-orange-700 whitespace-nowrap"
-                                >
-                                  Review
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* TRANSACTIONS - Below Files and Batches */}
-        <div className="bg-white border rounded-lg shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-slate-800 flex items-center space-x-2">
-              <ListChecks className="h-6 w-6 text-slate-700" />
-              <span>Transactions</span>
-              {selectedFile && (
-                <span className="text-sm text-slate-500 ml-2 font-normal">
-                  ({transactions.length} transactions from {selectedFile.fileName || 'selected file'})
-                </span>
-              )}
-            </h2>
-            {!selectedFile && (
-              <p className="text-sm text-slate-500">Select a file above to view transactions</p>
-            )}
-          </div>
-
-          <div className="border rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 sticky top-0">
-                  <tr className="border-b">
-                    <th className="w-8 p-3"></th>
-                    <th className="text-left p-3 font-medium text-slate-700">Date</th>
-                    <th className="text-left p-3 font-medium text-slate-700">Other Party</th>
-                    <th className="text-right p-3 font-medium text-slate-700">Amount</th>
-                    <th className="text-right p-3 font-medium text-slate-700">Remaining</th>
-                    <th className="text-center p-3 font-medium text-slate-700">Match Status</th>
-                    <th className="text-center p-3 font-medium text-slate-700">Allocation Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {!selectedFile ? (
-                    <tr>
-                      <td colSpan="7" className="p-12 text-center text-slate-400">
-                        <ListChecks className="h-12 w-12 mx-auto mb-3 text-slate-300" />
-                        <p className="text-base">Select a file to view transactions</p>
-                        <p className="text-sm mt-1">Use the file browser above to get started</p>
-                      </td>
+          {/* RIGHT COLUMN: Files List */}
+          <div className="bg-white border rounded-lg shadow-sm p-4 flex flex-col min-h-0">
+            <h2 className="text-lg font-semibold text-slate-800 mb-3 flex-shrink-0">Files</h2>
+            <div className="border rounded-lg overflow-hidden flex-1 flex flex-col min-h-0">
+              <div className="overflow-y-auto flex-1">
+                <table className="w-full text-xs">
+                  <thead className="bg-slate-50 sticky top-0 z-10">
+                    <tr className="border-b">
+                      <th className="text-left p-2 font-medium text-slate-700">Date Range</th>
+                      <th className="text-right p-2 font-medium text-slate-700">Trans.</th>
+                      <th className="text-right p-2 font-medium text-slate-700">Amount</th>
+                      <th className="text-right p-2 font-medium text-slate-700">To Process</th>
+                      <th className="text-center p-2 font-medium text-slate-700">Status</th>
                     </tr>
-                  ) : (
-                    transactions.map((txn) => (
-                      <tr
-                        key={txn.id}
-                        onClick={() => setSelectedTransaction(txn)}
-                        className={`border-b cursor-pointer hover:bg-slate-50 transition-colors ${
-                          selectedTransaction?.id === txn.id ? 'bg-blue-50 border-blue-200' : ''
-                        }`}
-                      >
-                        <td className="p-3">
-                          <input type="checkbox" checked={txn.skip} readOnly className="rounded" />
-                        </td>
-                        <td className="p-3">{formatDate(txn.date)}</td>
-                        <td className="p-3 font-medium">{txn.otherParty}</td>
-                        <td className="text-right p-3">{formatCurrency(txn.amount)}</td>
-                        <td className="text-right p-3 font-medium">
-                          <span className={txn.remaining > 0 ? 'text-orange-600' : 'text-green-600'}>
-                            {formatCurrency(txn.remaining)}
-                          </span>
-                        </td>
-                        <td className="text-center p-3">
-                          {txn.rulesApplied && txn.rulesApplied.length > 0 ? (
-                            <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                              Matched
+                  </thead>
+                  <tbody>
+                    {filteredFiles.map((file) => {
+                      const status = getFileStatus(file);
+                      return (
+                        <tr
+                          key={file.id}
+                          onClick={() => setSelectedFile(file)}
+                          className={`border-b cursor-pointer hover:bg-slate-50 transition-colors ${
+                            selectedFile?.id === file.id ? 'bg-blue-50' : ''
+                          }`}
+                        >
+                          <td className="p-2 whitespace-nowrap">{formatDate(file.dateFrom)}</td>
+                          <td className="text-right p-2">{file.totalTransactions.toLocaleString()}</td>
+                          <td className="text-right p-2">{formatCurrency(file.totalAmount)}</td>
+                          <td className="text-right p-2 font-medium">{file.numberToProcess}</td>
+                          <td className="text-center p-2">
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${status.color}`}>
+                              {status.label}
                             </span>
-                          ) : (
-                            <span className="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
-                              No Match
-                            </span>
-                          )}
-                        </td>
-                        <td className="text-center p-3">
-                          {txn.remaining === 0 ? (
-                            <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                              Fully Allocated
-                            </span>
-                          ) : txn.allocations.length > 0 ? (
-                            <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
-                              Partially Allocated
-                            </span>
-                          ) : (
-                            <span className="px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
-                              Unallocated
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
+
+        {/* LOCKBOX VALIDATION SCREEN - Replaces Transactions Section */}
+        <LockboxValidationScreen />
 
         {/* MODULAR SECTIONS: Rules and Allocation (always visible) */}
         {(hasLockboxConfig || hasCashAppConfig) && (
