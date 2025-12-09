@@ -261,7 +261,32 @@ const LockboxValidationScreen = () => {
 
   // Define columns for TanStack Table
   const columns = useMemo(() => [
-    // 1. SELECT COLUMN
+    // 1. NUMBER COLUMN
+    columnHelper.display({
+      id: 'number',
+      header: '#',
+      size: 50,
+      cell: ({ row }) => {
+        const { type, id } = row.original;
+        // Only show numbers for transaction rows (top-level payments)
+        if (type === 'transaction') {
+          // Count only transaction rows up to this point in the data array
+          const transactionRows = data.filter(r => r.type === 'transaction');
+          const transactionIndex = transactionRows.findIndex(r => r.id === id);
+          const rowNumber = transactionIndex + 1;
+          
+          return (
+            <div className="flex justify-center">
+              <span className="text-xs text-slate-500 font-medium">{rowNumber}</span>
+            </div>
+          );
+        }
+        
+        return null;
+      }
+    }),
+
+    // 2. SELECT COLUMN
     columnHelper.display({
       id: 'select',
       header: 'Select',
@@ -292,7 +317,7 @@ const LockboxValidationScreen = () => {
       }
     }),
 
-    // 2. TYPE COLUMN
+    // 3. TYPE COLUMN
     columnHelper.accessor((row) => {
       const typeSortOrder = {
         'file': 0,
@@ -351,7 +376,7 @@ const LockboxValidationScreen = () => {
       }
     }),
 
-    // 3. ID COLUMN
+    // 4. ID COLUMN
     columnHelper.accessor('id', {
       id: 'id',
       header: 'ID',
@@ -380,7 +405,7 @@ const LockboxValidationScreen = () => {
       }
     }),
 
-    // 4. AMOUNT COLUMN
+    // 5. AMOUNT COLUMN
     columnHelper.accessor('amount', {
       id: 'amount',
       header: 'Amount',
@@ -408,7 +433,7 @@ const LockboxValidationScreen = () => {
       }
     }),
 
-    // 5. DESCRIPTION COLUMN (renamed from Account)
+    // 6. DESCRIPTION COLUMN (renamed from Account)
     columnHelper.accessor('description', {
       id: 'description',
       header: 'Description',
@@ -430,7 +455,7 @@ const LockboxValidationScreen = () => {
       }
     }),
 
-    // 6. ACTIONS COLUMN (with Skip emoji integrated)
+    // 7. ACTIONS COLUMN (with Skip emoji integrated)
     columnHelper.display({
       id: 'actions',
       header: 'Actions',
@@ -483,7 +508,7 @@ const LockboxValidationScreen = () => {
         );
       }
     })
-  ], [files, skippedTransactions, toggleSkipTransaction, selectedForEdit, toggleSelectForEdit]);
+  ], [files, skippedTransactions, toggleSkipTransaction, selectedForEdit, toggleSelectForEdit, data]);
 
   // Create TanStack Table instance
   const table = useReactTable({
@@ -877,14 +902,21 @@ const LockboxValidationScreen = () => {
   const CorrectionModal = () => {
     if (!selectedItem || !showCorrectionModal) return null;
 
+    const currentTransaction = selectedItem.item;
+
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-slate-800">
-              {selectedItem.type === 'transaction' ? 'Edit Payment Allocation' :
-               selectedItem.type === 'invoice' ? 'Edit Invoice Allocation' : 'Allocate Remaining Amount'}
-            </h3>
+        <div className="bg-white rounded-lg p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4 pb-4 border-b">
+            <div>
+              <h3 className="text-lg font-semibold text-slate-800">
+                Edit Payment Allocation
+              </h3>
+              <p className="text-sm text-slate-500 mt-1">
+                Review and adjust allocation details for this payment.
+              </p>
+            </div>
             <button
               onClick={() => setShowCorrectionModal(false)}
               className="text-slate-400 hover:text-slate-600"
@@ -893,61 +925,129 @@ const LockboxValidationScreen = () => {
             </button>
           </div>
 
+          {/* Current Transaction Details */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-medium text-slate-800">Current Payment</h4>
+              <span className="text-xs text-slate-500">ID: {currentTransaction.id.split('-')[1]}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-slate-500">Other Party:</p>
+                <p className="font-medium text-slate-800">{currentTransaction.otherParty}</p>
+              </div>
+              <div>
+                <p className="text-slate-500">Reference:</p>
+                <p className="font-medium text-slate-800">{currentTransaction.reference}</p>
+              </div>
+              <div>
+                <p className="text-slate-500">Total Amount:</p>
+                <p className="font-medium text-green-600">{formatCurrency(currentTransaction.amount)}</p>
+              </div>
+              <div>
+                <p className="text-slate-500">Unallocated:</p>
+                <p className="font-medium text-orange-600">{formatCurrency(currentTransaction.unallocatedAmount)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Allocation Editor */}
           <div className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h4 className="font-medium text-slate-800 mb-2">Item Details:</h4>
-              <div className="text-sm text-slate-600">
-                {selectedItem.type === 'transaction' && (
+            <h4 className="font-medium text-slate-800">Edit Allocations</h4>
+
+            {/* Current Invoices */}
+            {currentTransaction.invoices.map((invoice, idx) => (
+              <div key={invoice.id} className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-medium text-slate-500">Invoice {idx + 1}</span>
+                  <button className="text-xs text-red-600 hover:text-red-700">Remove</button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
-                    <p>Amount: {formatCurrency(selectedItem.item.amount)}</p>
-                    <p>Reference: {selectedItem.item.reference}</p>
-                    <p>Issues: {selectedItem.item.issues.map(issue => issueTypes[issue]?.label).join(', ')}</p>
+                    <label className="block text-xs text-slate-600 mb-1">Customer/Account</label>
+                    <input
+                      type="text"
+                      defaultValue={invoice.customerName}
+                      className="w-full border border-slate-300 rounded px-3 py-2 text-sm"
+                      placeholder="Customer name"
+                    />
                   </div>
-                )}
-                {selectedItem.type === 'invoice' && (
                   <div>
-                    <p>Invoice: {selectedItem.item.invoiceNumber}</p>
-                    <p>Proposed Amount: {formatCurrency(selectedItem.item.proposedAmount)}</p>
-                    <p>Customer: {selectedItem.item.customerName}</p>
+                    <label className="block text-xs text-slate-600 mb-1">Invoice Number</label>
+                    <input
+                      type="text"
+                      defaultValue={invoice.invoiceNumber}
+                      className="w-full border border-slate-300 rounded px-3 py-2 text-sm"
+                      placeholder="Invoice #"
+                    />
                   </div>
-                )}
-                {selectedItem.type === 'unallocated' && (
                   <div>
-                    <p>Unallocated: {formatCurrency(selectedItem.item.unallocatedAmount)}</p>
-                    <p>From Payment: {formatCurrency(selectedItem.item.amount)}</p>
+                    <label className="block text-xs text-slate-600 mb-1">Allocated Amount</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      defaultValue={invoice.proposedAmount}
+                      className="w-full border border-slate-300 rounded px-3 py-2 text-sm"
+                      placeholder="0.00"
+                    />
                   </div>
-                )}
+                </div>
+              </div>
+            ))}
+
+            {/* Add New Allocation */}
+            <button className="w-full border-2 border-dashed border-slate-300 rounded-lg p-4 text-sm text-slate-600 hover:border-blue-400 hover:text-blue-600 transition-colors">
+              + Add New Invoice Allocation
+            </button>
+
+            {/* Quick Actions */}
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+              <h5 className="text-xs font-medium text-slate-700 mb-2">Quick Actions</h5>
+              <div className="flex space-x-2">
+                <button className="px-3 py-1.5 bg-white border border-slate-300 rounded text-xs hover:bg-slate-50">
+                  Auto-Match
+                </button>
+                <button className="px-3 py-1.5 bg-white border border-slate-300 rounded text-xs hover:bg-slate-50">
+                  Split Evenly
+                </button>
+                <button className="px-3 py-1.5 bg-white border border-slate-300 rounded text-xs hover:bg-slate-50">
+                  Clear All
+                </button>
               </div>
             </div>
 
-            <div className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center">
-              <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500 mb-2">Allocation Interface</p>
-              <p className="text-xs text-slate-400">
-                Full correction interface would be implemented here
+            {/* Audit Log placeholder */}
+            <div className="border border-slate-200 rounded-lg p-4">
+              <h4 className="font-medium text-slate-800 mb-2">Audit Log</h4>
+              <p className="text-xs text-slate-500 mb-3">
+                Audit log entries for this payment will appear here.
               </p>
+              <div className="h-20 bg-slate-50 border border-dashed border-slate-200 rounded flex items-center justify-center text-xs text-slate-400">
+                No audit entries yet
+              </div>
             </div>
+          </div>
 
-            <div className="flex space-x-3 pt-4 border-t">
-              <button
-                onClick={() => {
-                  // Update status based on type
-                  if (selectedItem.type === 'transaction') {
-                    updateItemStatus('transaction', selectedItem.fileId, selectedItem.transactionId, null, null, 'valid');
-                  }
-                  setShowCorrectionModal(false);
-                }}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-              >
-                Save
-              </button>
-              <button
-                onClick={() => setShowCorrectionModal(false)}
-                className="px-4 py-2 border border-slate-300 text-slate-700 rounded hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-            </div>
+          {/* Actions */}
+          <div className="flex items-center justify-end mt-6 pt-4 border-t space-x-2">
+            <button
+              onClick={() => setShowCorrectionModal(false)}
+              className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 text-sm font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                if (selectedItem.type === 'transaction') {
+                  updateItemStatus('transaction', selectedItem.fileId, selectedItem.transactionId, null, null, 'valid');
+                }
+                setShowCorrectionModal(false);
+              }}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium"
+            >
+              Save & Close
+            </button>
           </div>
         </div>
       </div>
