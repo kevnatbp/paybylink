@@ -286,19 +286,22 @@ const LockboxValidationScreen = () => {
       }
     }),
 
-    // 2. SELECT COLUMN
+    // 2. SELECT COLUMN (combined with Actions)
     columnHelper.display({
       id: 'select',
-      header: 'Select',
-      size: 60,
+      header: 'Select | Actions',
+      size: 150,
       cell: ({ row }) => {
-        const { type, transactionId } = row.original;
+        const { type, transactionId, data: itemData } = row.original;
 
-        // Only show checkbox for transaction rows
+        // For transaction rows: show checkbox, edit button, and skip button
         if (type === 'transaction') {
           const isSelected = selectedForEdit.has(transactionId);
+          const isSkipped = skippedTransactions.has(transactionId);
+
           return (
-            <div className="flex justify-center">
+            <div className="flex items-center justify-center space-x-2">
+              {/* Checkbox */}
               <input
                 type="checkbox"
                 checked={isSelected}
@@ -309,11 +312,51 @@ const LockboxValidationScreen = () => {
                 className="rounded border-blue-300 text-blue-600 focus:ring-blue-500"
                 title={isSelected ? "Selected for editing" : "Select for editing"}
               />
+              
+              {/* Separator */}
+              <span className="text-slate-300">|</span>
+              
+              {/* Edit button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedItem({ type: 'transaction', item: itemData, fileId: row.original.fileId, transactionId });
+                  setShowCorrectionModal(true);
+                }}
+                className="p-1 border border-slate-300 text-slate-600 rounded text-xs hover:bg-blue-100 hover:border-blue-300 transition-colors w-6 h-6 flex items-center justify-center"
+                title="Edit Allocation"
+              >
+                ✏️
+              </button>
+
+              {/* Separator */}
+              <span className="text-slate-300">|</span>
+
+              {/* Skip emoji button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleSkipTransaction(transactionId);
+                }}
+                className={`p-1 rounded text-sm transition-all ${
+                  isSkipped
+                    ? 'bg-red-100 border border-red-300 opacity-100'
+                    : 'border border-slate-200 opacity-40 hover:opacity-100 hover:bg-slate-50'
+                }`}
+                title={isSkipped ? "Will be skipped at posting (click to unskip)" : "Skip at posting"}
+              >
+                ⏩
+              </button>
             </div>
           );
         }
 
-        return null;
+        // For other row types, show the renderActions result
+        return (
+          <div className="flex justify-center">
+            {renderActions(type, itemData, row.original.fileId, row.original.transactionId, row.original.invoiceId)}
+          </div>
+        );
       }
     }),
 
@@ -452,60 +495,6 @@ const LockboxValidationScreen = () => {
         }
 
         return <span className="text-xs text-slate-600">-</span>;
-      }
-    }),
-
-    // 7. ACTIONS COLUMN (with Skip emoji integrated)
-    columnHelper.display({
-      id: 'actions',
-      header: 'Actions',
-      size: 100,
-      cell: ({ row }) => {
-        const { type, data: itemData, transactionId } = row.original;
-
-        if (type === 'transaction') {
-          const isSkipped = skippedTransactions.has(transactionId);
-
-          return (
-            <div className="flex items-center justify-center space-x-2">
-              {/* Edit button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedItem({ type: 'transaction', item: itemData, fileId: row.original.fileId, transactionId });
-                  setShowCorrectionModal(true);
-                }}
-                className="p-1 border border-slate-300 text-slate-600 rounded text-xs hover:bg-blue-100 hover:border-blue-300 transition-colors w-6 h-6 flex items-center justify-center"
-                title="Edit Allocation"
-              >
-                ✏️
-              </button>
-
-              {/* Skip emoji button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleSkipTransaction(transactionId);
-                }}
-                className={`p-1 rounded text-sm transition-all ${
-                  isSkipped
-                    ? 'bg-red-100 border border-red-300 opacity-100'
-                    : 'border border-slate-200 opacity-40 hover:opacity-100 hover:bg-slate-50'
-                }`}
-                title={isSkipped ? "Will be skipped at posting (click to unskip)" : "Skip at posting"}
-              >
-                📌
-              </button>
-            </div>
-          );
-        }
-
-        // Other row types
-        return (
-          <div className="flex justify-center">
-            {renderActions(type, itemData, row.original.fileId, row.original.transactionId, row.original.invoiceId)}
-          </div>
-        );
       }
     })
   ], [files, skippedTransactions, toggleSkipTransaction, selectedForEdit, toggleSelectForEdit, data]);
