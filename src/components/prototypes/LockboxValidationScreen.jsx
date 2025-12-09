@@ -476,11 +476,11 @@ const LockboxValidationScreen = () => {
       }
     }),
 
-    // 6. DESCRIPTION COLUMN (renamed from Account)
-    columnHelper.accessor('description', {
-      id: 'description',
-      header: 'Description',
-      size: 200,
+    // 6. ACCOUNT NAME COLUMN
+    columnHelper.accessor('account', {
+      id: 'account',
+      header: 'Account Name',
+      size: 180,
       cell: ({ row }) => {
         const { type, data: itemData } = row.original;
 
@@ -489,9 +489,31 @@ const LockboxValidationScreen = () => {
         } else if (type === 'invoice') {
           return <span className="text-xs text-slate-600">{itemData.customerName}</span>;
         } else if (type === 'file') {
+          return <span className="text-xs text-slate-600">-</span>;
+        } else if (type === 'lineItem') {
+          return <span className="text-xs text-slate-600">-</span>;
+        }
+
+        return <span className="text-xs text-slate-600">-</span>;
+      }
+    }),
+
+    // 7. DESCRIPTION COLUMN
+    columnHelper.accessor('description', {
+      id: 'description',
+      header: 'Description',
+      size: 200,
+      cell: ({ row }) => {
+        const { type, data: itemData } = row.original;
+
+        if (type === 'transaction') {
+          return <span className="text-xs text-slate-600">{itemData.reference || 'Payment transaction'}</span>;
+        } else if (type === 'invoice') {
+          return <span className="text-xs text-slate-600">{itemData.invoiceNumber ? `Invoice ${itemData.invoiceNumber}` : 'Invoice allocation'}</span>;
+        } else if (type === 'file') {
           return <span className="text-xs text-slate-600">Lockbox file</span>;
         } else if (type === 'lineItem') {
-          return <span className="text-xs text-slate-600">{itemData.matchDescription || 'Line item'}</span>;
+          return <span className="text-xs text-slate-600">{itemData.matchDescription || itemData.description || 'Line item'}</span>;
         }
 
         return <span className="text-xs text-slate-600">-</span>;
@@ -1148,15 +1170,34 @@ const LockboxValidationScreen = () => {
                   // Pre-calculate transaction groupings for efficient row coloring
                   const allRows = table.getRowModel().rows;
                   const transactionIds = [...new Set(allRows.map(r => r.original.transactionId).filter(Boolean))];
+                  
+                  // Pre-calculate unallocated status for all transactions
+                  const unallocatedMap = new Map();
+                  files.forEach(file => {
+                    file.transactions.forEach(txn => {
+                      unallocatedMap.set(txn.id, txn.unallocatedAmount > 0);
+                    });
+                  });
 
                   return allRows.map((row) => {
-                    const { type, transactionId } = row.original;
+                    const { type, transactionId, data: itemData } = row.original;
                     const isSkipped = transactionId && skippedTransactions.has(transactionId);
                     const isSelected = transactionId && selectedForEdit.has(transactionId);
+                    
+                    // Check if transaction has unallocated amount (partially allocated)
+                    let hasUnallocated = false;
+                    if (type === 'transaction' && itemData?.unallocatedAmount > 0) {
+                      hasUnallocated = true;
+                    } else if (transactionId && (type === 'invoice' || type === 'lineItem' || type === 'unallocated')) {
+                      // For child rows, check the parent transaction's unallocated amount
+                      hasUnallocated = unallocatedMap.get(transactionId) || false;
+                    }
 
                     // Calculate background color based on payment grouping (stable positioning)
                     let backgroundClass;
-                    if (isSelected) {
+                    if (hasUnallocated) {
+                      backgroundClass = 'bg-yellow-50 border-yellow-200'; // Partially allocated rows get yellow background
+                    } else if (isSelected) {
                       backgroundClass = 'bg-blue-100 border-blue-300'; // Selected rows get blue background
                     } else if (isSkipped) {
                       backgroundClass = 'bg-red-50 opacity-60'; // Skipped rows get light red background
@@ -1172,7 +1213,11 @@ const LockboxValidationScreen = () => {
                   return (
                     <tr
                       key={row.id}
-                      className={`border-b hover:bg-blue-50 hover:border-blue-200 transition-all duration-300 ${backgroundClass} ${isSkipped ? 'line-through text-slate-400' : ''}`}
+                      className={`border-b transition-all duration-300 ${backgroundClass} ${isSkipped ? 'line-through text-slate-400' : ''} ${
+                        hasUnallocated 
+                          ? 'hover:bg-yellow-100 hover:border-yellow-300' 
+                          : 'hover:bg-blue-50 hover:border-blue-200'
+                      }`}
                     >
                       {row.getVisibleCells().map((cell, index, array) => (
                         <td
