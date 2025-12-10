@@ -20,8 +20,10 @@ export const mockLockboxFiles = [
         date: '2025-11-30',
         bankAccount: 'B061801',
         status: 'needs_review',
-        ruleApplied: 'rule-3',
-        ruleExplanation: 'Matched multiple invoices in reference field',
+        accountMatchRule: 'lbr-2',
+        accountMatchExplanation: 'Account Match: Customer Name Match',
+        invoiceMatchRule: 'cas-3',
+        invoiceMatchExplanation: 'Invoice Match: Multi-Invoice Split',
         expanded: false,
         issues: ['unallocated_remainder', 'allocation_split_required'],
         invoices: [
@@ -61,8 +63,10 @@ export const mockLockboxFiles = [
         date: '2025-11-30',
         bankAccount: 'B061801',
         status: 'valid',
-        ruleApplied: 'rule-1',
-        ruleExplanation: 'Invoice number exact match',
+        accountMatchRule: 'lbr-2',
+        accountMatchExplanation: 'Account Match: Customer Name Match',
+        invoiceMatchRule: 'cas-1',
+        invoiceMatchExplanation: 'Invoice Match: Invoice Number Exact Match',
         expanded: false,
         issues: [],
         invoices: [
@@ -90,8 +94,10 @@ export const mockLockboxFiles = [
         date: '2025-11-30',
         bankAccount: 'B061801',
         status: 'needs_review',
-        ruleApplied: null,
-        ruleExplanation: 'No rules matched this payment',
+        accountMatchRule: 'lbr-2',
+        accountMatchExplanation: 'Account Match: Customer Name Match',
+        invoiceMatchRule: null,
+        invoiceMatchExplanation: 'Invoice Match: No matching invoices found',
         expanded: false,
         issues: ['no_match_found', 'manual_allocation_required'],
         invoices: [],
@@ -105,8 +111,10 @@ export const mockLockboxFiles = [
         date: '2025-11-30',
         bankAccount: 'B061801',
         status: 'valid',
-        ruleApplied: 'rule-2',
-        ruleExplanation: 'Account + amount match within tolerance',
+        accountMatchRule: 'lbr-1',
+        accountMatchExplanation: 'Account Match: Account ID in Reference',
+        invoiceMatchRule: 'cas-2',
+        invoiceMatchExplanation: 'Invoice Match: Amount Match with Tolerance',
         expanded: false,
         issues: [],
         invoices: [
@@ -133,8 +141,10 @@ export const mockLockboxFiles = [
         date: '2025-11-30',
         bankAccount: 'B061801',
         status: 'needs_review',
-        ruleApplied: 'rule-3',
-        ruleExplanation: 'Multiple invoices detected, allocation split needed',
+        accountMatchRule: 'lbr-2',
+        accountMatchExplanation: 'Account Match: Customer Name Match',
+        invoiceMatchRule: 'cas-3',
+        invoiceMatchExplanation: 'Invoice Match: Multi-Invoice Split',
         expanded: false,
         issues: ['unallocated_remainder', 'verify_allocation_amounts'],
         invoices: [
@@ -186,8 +196,10 @@ export const mockLockboxFiles = [
         date: '2025-11-30',
         bankAccount: 'B061801',
         status: 'needs_review',
-        ruleApplied: null,
-        ruleExplanation: 'No rules matched - reference contains no invoice identifiers',
+        accountMatchRule: 'lbr-2',
+        accountMatchExplanation: 'Account Match: Customer Name Match',
+        invoiceMatchRule: null,
+        invoiceMatchExplanation: 'Invoice Match: No matching invoices found',
         expanded: false,
         issues: ['no_match_found', 'manual_allocation_required'],
         invoices: [],
@@ -197,13 +209,59 @@ export const mockLockboxFiles = [
   }
 ];
 
-// Rule explanations showing what each rule does and limitations
-export const ruleExplanations = {
-  'rule-1': {
-    id: 'rule-1',
+// LOCKBOX MATCHING RULES - Match payments to customers/accounts
+export const lockboxMatchingRules = {
+  'lbr-1': {
+    id: 'lbr-1',
+    name: 'Account ID in Reference',
+    type: 'lockbox_matching',
+    description: 'Match payment to customer by finding account ID in reference field',
+    logic: 'IF payment_reference CONTAINS customer_account_id THEN assign_to_customer',
+    matchedCount: 25,
+    confidence: 'high',
+    limitations: [],
+    examples: [
+      {
+        payment: 'ACC-B061801-945.50',
+        accountId: 'B061801',
+        customer: 'Delta Corp',
+        confidence: 'high'
+      }
+    ]
+  },
+  'lbr-2': {
+    id: 'lbr-2',
+    name: 'Customer Name Match',
+    type: 'lockbox_matching',
+    description: 'Match payment to customer by comparing other party name',
+    logic: 'IF payment_other_party FUZZY_MATCHES customer_name THEN assign_to_customer',
+    matchedCount: 18,
+    confidence: 'medium',
+    limitations: [
+      'Cannot handle name variations well',
+      'May require exact or very close match'
+    ]
+  },
+  'lbr-3': {
+    id: 'lbr-3',
+    name: 'Bank Account Matching',
+    type: 'lockbox_matching',
+    description: 'Match payment to customer by bank account number',
+    logic: 'IF payment_bank_account EQUALS customer_bank_account THEN assign_to_customer',
+    matchedCount: 12,
+    confidence: 'high',
+    limitations: []
+  }
+};
+
+// CASH APPLICATION STRATEGIES - Match payments to specific invoices
+export const cashApplicationStrategies = {
+  'cas-1': {
+    id: 'cas-1',
     name: 'Invoice Number Exact Match',
+    type: 'cash_application',
     description: 'Match payment reference to invoice number (exact)',
-    logic: 'IF payment_reference EQUALS invoice_number THEN allocate_full_amount',
+    logic: 'IF payment_reference CONTAINS invoice_number THEN allocate_to_invoice',
     matchedCount: 18,
     confidence: 'high',
     limitations: [],
@@ -215,22 +273,24 @@ export const ruleExplanations = {
       }
     ]
   },
-  'rule-2': {
-    id: 'rule-2',
-    name: 'Account + Amount Fuzzy Match',
-    description: 'Match by account ID AND amount within 5% tolerance',
-    logic: 'IF account_id EQUALS customer_account AND amount_difference < 5% THEN allocate',
+  'cas-2': {
+    id: 'cas-2',
+    name: 'Amount Match with Tolerance',
+    type: 'cash_application',
+    description: 'Match payment to invoice by amount within 5% tolerance',
+    logic: 'IF ABS(payment_amount - invoice_amount) < 5% THEN allocate_to_invoice',
     matchedCount: 12,
     confidence: 'medium',
     limitations: [
-      'Cannot use "contains" - requires exact account match',
-      'Cannot calculate percentage - uses fixed tolerance only'
+      'Cannot calculate percentage - uses fixed tolerance only',
+      'May match wrong invoice if multiple similar amounts exist'
     ]
   },
-  'rule-3': {
-    id: 'rule-3',
-    name: 'Multi-Invoice Reference Match',
-    description: 'Find multiple invoice numbers in reference field',
+  'cas-3': {
+    id: 'cas-3',
+    name: 'Multi-Invoice Split',
+    type: 'cash_application',
+    description: 'Find multiple invoice numbers in reference field and split payment',
     logic: 'IF payment_reference CONTAINS multiple_invoice_patterns THEN suggest_split',
     matchedCount: 5,
     confidence: 'low',
@@ -239,7 +299,26 @@ export const ruleExplanations = {
       'No AND/OR logic available for complex matching',
       'Requires manual allocation decision'
     ]
+  },
+  'cas-4': {
+    id: 'cas-4',
+    name: 'Oldest Invoice First',
+    type: 'cash_application',
+    description: 'Apply payment to oldest outstanding invoice first',
+    logic: 'ORDER invoices BY due_date ASC THEN allocate_sequentially',
+    matchedCount: 8,
+    confidence: 'medium',
+    limitations: [
+      'May not match customer intent',
+      'Cannot handle partial payments well'
+    ]
   }
+};
+
+// Combined rules for easy lookup
+export const ruleExplanations = {
+  ...lockboxMatchingRules,
+  ...cashApplicationStrategies
 };
 
 // Individual payment allocations with their status and issues
@@ -252,8 +331,10 @@ export const mockPaymentAllocations = {
     date: '2025-11-30',
     bankAccount: 'B061801',
     status: 'needs_review',
-    ruleApplied: 'rule-3',
-    ruleExplanation: 'Matched multiple invoices in reference field',
+    accountMatchRule: 'lbr-2',
+    accountMatchExplanation: 'Account Match: Customer Name Match',
+    invoiceMatchRule: 'cas-3',
+    invoiceMatchExplanation: 'Invoice Match: Multi-Invoice Split',
     proposedAllocations: [
       {
         invoiceNumber: 'INV-001',
@@ -284,8 +365,10 @@ export const mockPaymentAllocations = {
     date: '2025-11-30',
     bankAccount: 'B061801',
     status: 'valid',
-    ruleApplied: 'rule-1',
-    ruleExplanation: 'Invoice number exact match',
+    accountMatchRule: 'lbr-2',
+    accountMatchExplanation: 'Account Match: Customer Name Match',
+    invoiceMatchRule: 'cas-1',
+    invoiceMatchExplanation: 'Invoice Match: Invoice Number Exact Match',
     proposedAllocations: [
       {
         invoiceNumber: 'INV-002',
@@ -306,8 +389,10 @@ export const mockPaymentAllocations = {
     date: '2025-11-30',
     bankAccount: 'B061801',
     status: 'needs_review',
-    ruleApplied: null,
-    ruleExplanation: 'No rules matched this payment',
+    accountMatchRule: 'lbr-2',
+    accountMatchExplanation: 'Account Match: Customer Name Match',
+    invoiceMatchRule: null,
+    invoiceMatchExplanation: 'Invoice Match: No matching invoices found',
     proposedAllocations: [],
     unallocatedAmount: 1500.00,
     issues: [
@@ -324,8 +409,10 @@ export const mockPaymentAllocations = {
     date: '2025-11-30',
     bankAccount: 'B061801',
     status: 'valid',
-    ruleApplied: 'rule-2',
-    ruleExplanation: 'Account + amount match within tolerance',
+    accountMatchRule: 'lbr-1',
+    accountMatchExplanation: 'Account Match: Account ID in Reference',
+    invoiceMatchRule: 'cas-2',
+    invoiceMatchExplanation: 'Invoice Match: Amount Match with Tolerance',
     proposedAllocations: [
       {
         invoiceNumber: 'INV-088',
@@ -346,8 +433,10 @@ export const mockPaymentAllocations = {
     date: '2025-11-30',
     bankAccount: 'B061801',
     status: 'needs_review',
-    ruleApplied: 'rule-3',
-    ruleExplanation: 'Multiple invoices detected, allocation split needed',
+    accountMatchRule: 'lbr-2',
+    accountMatchExplanation: 'Account Match: Customer Name Match',
+    invoiceMatchRule: 'cas-3',
+    invoiceMatchExplanation: 'Invoice Match: Multi-Invoice Split',
     proposedAllocations: [
       {
         invoiceNumber: 'INV-201',
@@ -392,6 +481,8 @@ const generateValidPayments = () => {
     const invoiceNum = `INV-${String(300 + i).padStart(3, '0')}`;
     const amount = Math.round((Math.random() * 2000 + 200) * 100) / 100;
 
+    const useInvoiceMatch = Math.random() > 0.5;
+
     validPayments[paymentId] = {
       id: paymentId,
       amount,
@@ -400,8 +491,10 @@ const generateValidPayments = () => {
       date: '2025-11-30',
       bankAccount: 'B061801',
       status: 'valid',
-      ruleApplied: Math.random() > 0.5 ? 'rule-1' : 'rule-2',
-      ruleExplanation: Math.random() > 0.5 ? 'Invoice number exact match' : 'Account + amount match',
+      accountMatchRule: 'lbr-2',
+      accountMatchExplanation: 'Account Match: Customer Name Match',
+      invoiceMatchRule: useInvoiceMatch ? 'cas-1' : 'cas-2',
+      invoiceMatchExplanation: useInvoiceMatch ? 'Invoice Match: Invoice Number Exact Match' : 'Invoice Match: Amount Match with Tolerance',
       proposedAllocations: [
         {
           invoiceNumber: invoiceNum,

@@ -518,6 +518,38 @@ const LockboxValidationScreen = () => {
 
         return <span className="text-xs text-slate-600">-</span>;
       }
+    }),
+
+    // 8. MATCHING RULES COLUMN
+    columnHelper.accessor('matchingRules', {
+      id: 'matchingRules',
+      header: 'Matching Rules',
+      size: 300,
+      cell: ({ row }) => {
+        const { type, data: itemData } = row.original;
+
+        // Only show matching rules for transaction rows
+        if (type === 'transaction') {
+          return (
+            <div className="flex flex-col space-y-1">
+              {/* Account Match Rule */}
+              {itemData.accountMatchExplanation && (
+                <span className="text-xs text-slate-700 font-medium">
+                  {itemData.accountMatchExplanation}
+                </span>
+              )}
+              {/* Invoice Match Rule */}
+              {itemData.invoiceMatchExplanation && (
+                <span className="text-xs text-slate-600">
+                  {itemData.invoiceMatchExplanation}
+                </span>
+              )}
+            </div>
+          );
+        }
+
+        return null;
+      }
     })
   ], [files, skippedTransactions, toggleSkipTransaction, selectedForEdit, toggleSelectForEdit, data]);
 
