@@ -30,19 +30,9 @@ const flattenData = (files) => {
   const flattened = [];
 
   files.forEach(file => {
-    // Add file row
-    flattened.push({
-      id: file.id,
-      type: 'file',
-      level: 0,
-      data: file,
-      parentId: null,
-      fileId: file.id,
-      transactionId: null,
-      invoiceId: null
-    });
-
-    if (file.expanded) {
+    // Skip file row since we're already in file context
+    // Start directly with transactions
+    if (file.expanded || true) { // Always show transactions
       // Sort transactions to put "needs_review" items first, then by payment ID for stable positioning
       const sortedTransactions = [...file.transactions].sort((a, b) => {
         const statusOrder = { 'needs_review': 0, 'proposed': 1, 'valid': 2 };
@@ -58,13 +48,13 @@ const flattenData = (files) => {
       });
 
       sortedTransactions.forEach(txn => {
-        // Add transaction row
+        // Add transaction row (now at level 0)
         flattened.push({
           id: txn.id,
           type: 'transaction',
-          level: 1,
+          level: 0,
           data: txn,
-          parentId: file.id,
+          parentId: null,
           fileId: file.id,
           transactionId: txn.id,
           invoiceId: null
@@ -72,11 +62,11 @@ const flattenData = (files) => {
 
         if (txn.expanded) {
           txn.invoices.forEach(invoice => {
-            // Add invoice row
+            // Add invoice row (now at level 1)
             flattened.push({
               id: invoice.id,
               type: 'invoice',
-              level: 2,
+              level: 1,
               data: invoice,
               parentId: txn.id,
               fileId: file.id,
@@ -86,11 +76,11 @@ const flattenData = (files) => {
 
             if (invoice.expanded) {
               invoice.lineItems.forEach(lineItem => {
-                // Add line item row
+                // Add line item row (now at level 2)
                 flattened.push({
                   id: lineItem.id,
                   type: 'lineItem',
-                  level: 3,
+                  level: 2,
                   data: lineItem,
                   parentId: invoice.id,
                   fileId: file.id,
@@ -101,12 +91,12 @@ const flattenData = (files) => {
             }
           });
 
-          // Add unallocated row if exists
+          // Add unallocated row if exists (now at level 1)
           if (txn.unallocatedAmount > 0) {
             flattened.push({
               id: `${txn.id}-unallocated`,
               type: 'unallocated',
-              level: 2,
+              level: 1,
               data: { ...txn, unallocatedAmount: txn.unallocatedAmount },
               parentId: txn.id,
               fileId: file.id,
@@ -363,11 +353,10 @@ const LockboxValidationScreen = () => {
     // 3. TYPE COLUMN
     columnHelper.accessor((row) => {
       const typeSortOrder = {
-        'file': 0,
-        'transaction': 1,
-        'invoice': 2,
-        'unallocated': 2,
-        'lineItem': 3
+        'transaction': 0,
+        'invoice': 1,
+        'unallocated': 1,
+        'lineItem': 2
       };
       return typeSortOrder[row.type] || 999;
     }, {
@@ -380,15 +369,13 @@ const LockboxValidationScreen = () => {
         const paddingLeft = level * 24 + 8;
 
         const typeLabels = {
-          file: 'File',
           transaction: 'Payment',
           invoice: 'Invoice',
           lineItem: 'Item',
           unallocated: 'Unallocated'
         };
 
-        const canExpand = (type === 'file' && itemData.transactions?.length > 0) ||
-                         (type === 'transaction' && itemData.invoices?.length > 0) ||
+        const canExpand = (type === 'transaction' && itemData.invoices?.length > 0) ||
                          (type === 'invoice' && itemData.lineItems?.length > 0);
 
         return (
@@ -396,9 +383,7 @@ const LockboxValidationScreen = () => {
             {canExpand ? (
               <button
                 onClick={() => {
-                  if (type === 'file') {
-                    toggleExpanded('file', itemData.id);
-                  } else if (type === 'transaction') {
+                  if (type === 'transaction') {
                     toggleExpanded('transaction', row.original.fileId, itemData.id);
                   } else if (type === 'invoice') {
                     toggleExpanded('invoice', row.original.fileId, row.original.transactionId, itemData.id);
@@ -427,9 +412,7 @@ const LockboxValidationScreen = () => {
       cell: ({ row }) => {
         const { type, data: itemData } = row.original;
 
-        if (type === 'file') {
-          return <span className="text-sm font-medium text-slate-800">{itemData.fileName}</span>;
-        } else if (type === 'transaction') {
+        if (type === 'transaction') {
           return <span className="text-sm font-medium text-slate-800">{itemData.id.split('-')[1]}</span>;
         } else if (type === 'invoice') {
           return <span className="text-sm font-medium text-slate-800">{itemData.invoiceNumber}</span>;
@@ -459,9 +442,7 @@ const LockboxValidationScreen = () => {
         let amount = 0;
         let colorClass = 'text-slate-800';
 
-        if (type === 'file') {
-          amount = itemData.totalAmount;
-        } else if (type === 'transaction') {
+        if (type === 'transaction') {
           amount = itemData.amount;
         } else if (type === 'invoice') {
           amount = itemData.proposedAmount;
@@ -488,8 +469,6 @@ const LockboxValidationScreen = () => {
           return <span className="text-xs text-slate-600">{itemData.otherParty}</span>;
         } else if (type === 'invoice') {
           return <span className="text-xs text-slate-600">{itemData.customerName}</span>;
-        } else if (type === 'file') {
-          return <span className="text-xs text-slate-600">-</span>;
         } else if (type === 'lineItem') {
           return <span className="text-xs text-slate-600">-</span>;
         }
@@ -510,8 +489,6 @@ const LockboxValidationScreen = () => {
           return <span className="text-xs text-slate-600">{itemData.reference || 'Payment transaction'}</span>;
         } else if (type === 'invoice') {
           return <span className="text-xs text-slate-600">{itemData.invoiceNumber ? `Invoice ${itemData.invoiceNumber}` : 'Invoice allocation'}</span>;
-        } else if (type === 'file') {
-          return <span className="text-xs text-slate-600">Lockbox file</span>;
         } else if (type === 'lineItem') {
           return <span className="text-xs text-slate-600">{itemData.matchDescription || itemData.description || 'Line item'}</span>;
         }
@@ -520,30 +497,56 @@ const LockboxValidationScreen = () => {
       }
     }),
 
-    // 8. MATCHING RULES COLUMN
+    // 8. MATCHING RULES COLUMN (Enhanced)
     columnHelper.accessor('matchingRules', {
       id: 'matchingRules',
       header: 'Matching Rules',
-      size: 300,
+      size: 350,
       cell: ({ row }) => {
         const { type, data: itemData } = row.original;
 
-        // Only show matching rules for transaction rows
+        // Show matching rules for different row types
         if (type === 'transaction') {
           return (
             <div className="flex flex-col space-y-1">
-              {/* Account Match Rule */}
+              {/* Lockbox Match Rule */}
               {itemData.accountMatchExplanation && (
-                <span className="text-xs text-slate-700 font-medium">
-                  {itemData.accountMatchExplanation}
-                </span>
+                <div className="text-xs">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 mr-2">
+                    Lockbox
+                  </span>
+                  <span className="text-gray-700">{itemData.accountMatchExplanation}</span>
+                </div>
               )}
               {/* Invoice Match Rule */}
               {itemData.invoiceMatchExplanation && (
-                <span className="text-xs text-slate-600">
-                  {itemData.invoiceMatchExplanation}
-                </span>
+                <div className="text-xs">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200 mr-2">
+                    Invoice
+                  </span>
+                  <span className="text-gray-700">{itemData.invoiceMatchExplanation}</span>
+                </div>
               )}
+              {/* Default rule if none specified */}
+              {!itemData.accountMatchExplanation && !itemData.invoiceMatchExplanation && (
+                <div className="text-xs">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600 border border-gray-200">
+                    Auto-match
+                  </span>
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        // Show invoice-specific matching for invoice rows
+        if (type === 'invoice' && itemData.matchDescription) {
+          return (
+            <div className="text-xs">
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200 mr-2">
+                Invoice
+              </span>
+              <span className="text-gray-600">{itemData.matchDescription}</span>
             </div>
           );
         }
@@ -563,8 +566,7 @@ const LockboxValidationScreen = () => {
     enableExpanding: true,
     getRowCanExpand: (row) => {
       const { type, data: itemData } = row.original;
-      return (type === 'file' && itemData.transactions?.length > 0) ||
-             (type === 'transaction' && itemData.invoices?.length > 0) ||
+      return (type === 'transaction' && itemData.invoices?.length > 0) ||
              (type === 'invoice' && itemData.lineItems?.length > 0);
     },
     state: {
@@ -680,19 +682,6 @@ const LockboxValidationScreen = () => {
 
   // Render action buttons for each row type
   const renderActions = (type, item, fileId, transactionId = null, invoiceId = null) => {
-    if (type === 'file') {
-      return (
-        <div className="flex space-x-1 justify-center">
-          <button
-            className="p-1 border border-slate-300 text-slate-600 rounded text-xs hover:bg-blue-100 hover:border-blue-300 transition-colors w-6 h-6 flex items-center justify-center"
-            title="View File Details"
-          >
-            📄
-          </button>
-        </div>
-      );
-    }
-
     if (type === 'transaction') {
       return (
         <div className="flex space-x-1 justify-center">
@@ -1098,78 +1087,118 @@ const LockboxValidationScreen = () => {
   };
 
   return (
-    <div className="w-full bg-slate-50 min-h-screen">
-      {/* HEADER */}
-      <div className="border-b bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <h1 className="text-xl font-semibold text-slate-800">
-            Allocation Review & Edit
-          </h1>
-          <p className="text-sm text-slate-600 mt-1">
-            Review and edit payment allocations. All transactions are editable.
-          </p>
+    <div className="w-full bg-gray-50 min-h-screen">
+      {/* BILLINGPLATFORM-STYLE HEADER */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-full mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <div className="w-6 h-6 bg-blue-600 rounded flex items-center justify-center">
+                  <FileText className="w-4 h-4 text-white" />
+                </div>
+                <span className="text-sm text-gray-600">Lockbox Files</span>
+                <span className="text-sm text-gray-400">|</span>
+                <span className="text-sm font-medium text-gray-900">file-30-11-2025.csv</span>
+              </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              <button
+                disabled
+                className="px-4 py-2 bg-gray-400 text-white rounded text-sm font-medium cursor-not-allowed opacity-75"
+              >
+                Posted
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* MAIN CONTENT */}
-      <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+      <div className="max-w-full mx-auto px-6 py-6 space-y-6">
 
-        {/* SUMMARY STATS */}
-        <div className="bg-white border rounded-lg shadow-sm p-4">
-          <div className="grid grid-cols-5 gap-6">
-            <div className="text-center">
-              <span className="text-xs text-slate-500 border border-slate-200 px-2 py-1 rounded mb-2 inline-block">Files</span>
-              <p className="text-lg font-bold text-slate-800">{stats.totalFiles}</p>
+        {/* FILE STATUS OVERVIEW */}
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="p-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-medium text-gray-900">file-30-11-2025.csv</h2>
+                <div className="flex items-center space-x-4 mt-2">
+                  <div className="text-sm text-gray-600">
+                    <span className="font-medium">{stats.totalTransactions}</span> payments
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    <span className="font-medium">{formatCurrency(stats.totalAmount)}</span> total
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    <span className="font-medium">{Math.round((stats.valid / stats.totalTransactions) * 100)}%</span> Reconciled
+                  </div>
+                </div>
+              </div>
+              <div className="flex-1 max-w-xs mx-8">
+                <div className="relative">
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-green-400 to-green-500 rounded-full transition-all duration-300"
+                      style={{ width: `${(stats.valid / stats.totalTransactions) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="text-center">
-              <span className="text-xs text-slate-500 border border-slate-200 px-2 py-1 rounded mb-2 inline-block">Payments</span>
-              <p className="text-lg font-bold text-slate-800">{stats.totalTransactions}</p>
-            </div>
-            <div className="text-center">
-              <span className="text-xs text-slate-500 border border-slate-200 px-2 py-1 rounded mb-2 inline-block">Total Volume</span>
-              <p className="text-lg font-bold text-blue-600">{formatCurrency(stats.totalAmount)}</p>
-            </div>
-            <div className="text-center">
-              <span className="text-xs text-slate-500 border border-slate-200 px-2 py-1 rounded mb-2 inline-block">Fully Allocated</span>
-              <p className="text-lg font-bold text-blue-600">{stats.valid}</p>
-            </div>
-            <div className="text-center">
-              <span className="text-xs text-slate-500 border border-slate-200 px-2 py-1 rounded mb-2 inline-block">Partial/Unallocated</span>
-              <p className="text-lg font-bold text-orange-600">{stats.needsReview}</p>
+          </div>
+
+          {/* RECONCILED VS UNRECONCILED STATS */}
+          <div className="p-4">
+            <div className="grid grid-cols-2 gap-6">
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                  <span className="text-sm font-medium text-gray-900">RECONCILED</span>
+                </div>
+                <span className="text-2xl font-bold text-gray-900">{stats.valid}</span>
+              </div>
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2">
+                  <AlertTriangle className="w-5 h-5 text-orange-500" />
+                  <span className="text-sm font-medium text-gray-900">UNRECONCILED</span>
+                </div>
+                <span className="text-2xl font-bold text-gray-900">{stats.needsReview}</span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* CONSOLIDATED TABLE */}
-        <div className="bg-white border rounded-lg shadow-sm">
-          <div className="p-4 border-b">
+        {/* PAYMENT ALLOCATIONS TABLE */}
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-800">
-                Payment Allocations
-              </h3>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-4">
+                <h3 className="text-sm font-medium text-gray-900">
+                  Payment Allocations - Hierarchical View
+                </h3>
                 {selectedForEdit.size > 0 && (
-                  <>
-                    <span className="text-xs text-blue-700 bg-blue-50 px-3 py-1.5 rounded-full font-medium border border-blue-200">
-                      {selectedForEdit.size} Selected
-                    </span>
-                    <button
-                      onClick={openMultiEditModal}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors flex items-center space-x-2"
-                    >
-                      <Edit className="h-4 w-4" />
-                      <span>Edit Selected ({selectedForEdit.size})</span>
-                    </button>
-                  </>
-                )}
-                {skippedTransactions.size > 0 && (
-                  <span className="text-xs text-red-700 bg-red-100 px-3 py-1.5 rounded-full font-medium">
-                    {skippedTransactions.size} Marked to Skip
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    {selectedForEdit.size} Selected
                   </span>
                 )}
-                <span className="text-xs text-blue-600 bg-blue-100 px-3 py-1.5 rounded-full font-medium">
-                  All Editable
-                </span>
+                {skippedTransactions.size > 0 && (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                    {skippedTransactions.size} to Skip
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center space-x-2">
+                {selectedForEdit.size > 0 && (
+                  <button
+                    onClick={openMultiEditModal}
+                    className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    <Edit className="h-4 w-4 mr-1" />
+                    Edit Selected
+                  </button>
+                )}
+                <span className="text-xs text-gray-500">Showing 1 to 10 of {data.length} rows</span>
               </div>
             </div>
           </div>
@@ -1177,14 +1206,14 @@ const LockboxValidationScreen = () => {
           <div className="p-4">
             <div className="border border-slate-200 rounded-lg overflow-hidden">
               <table className="w-full">
-                <thead className="bg-slate-50 border-b border-slate-200">
+                <thead className="bg-gray-50 border-b border-gray-200">
                   {table.getHeaderGroups().map(headerGroup => (
                     <tr key={headerGroup.id}>
                       {headerGroup.headers.map((header, index, array) => (
                         <th
                           key={header.id}
-                          className={`text-left p-2 font-medium text-slate-700 ${
-                            index < array.length - 1 ? 'border-r border-slate-200' : ''
+                          className={`text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                            index < array.length - 1 ? 'border-r border-gray-200' : ''
                           }`}
                           style={{ width: `${header.getSize()}px` }}
                         >
@@ -1228,34 +1257,32 @@ const LockboxValidationScreen = () => {
                     // Calculate background color based on payment grouping (stable positioning)
                     let backgroundClass;
                     if (hasUnallocated) {
-                      backgroundClass = 'bg-yellow-50 border-yellow-200'; // Partially allocated rows get yellow background
+                      backgroundClass = 'bg-yellow-50'; // Partially allocated rows get yellow background
                     } else if (isSelected) {
-                      backgroundClass = 'bg-blue-100 border-blue-300'; // Selected rows get blue background
+                      backgroundClass = 'bg-blue-50'; // Selected rows get blue background
                     } else if (isSkipped) {
                       backgroundClass = 'bg-red-50 opacity-60'; // Skipped rows get light red background
-                    } else if (type === 'file') {
-                      backgroundClass = 'bg-white'; // Files get white background
                     } else {
                       // Use payment ID position for stable alternating colors, regardless of status
                       const transactionIndex = transactionIds.indexOf(transactionId);
                       const isEvenPayment = transactionIndex % 2 === 0;
-                      backgroundClass = isEvenPayment ? 'bg-slate-50' : 'bg-white';
+                      backgroundClass = isEvenPayment ? 'bg-white' : 'bg-gray-50';
                     }
 
                   return (
                     <tr
                       key={row.id}
-                      className={`border-b transition-all duration-300 ${backgroundClass} ${isSkipped ? 'line-through text-slate-400' : ''} ${
-                        hasUnallocated 
-                          ? 'hover:bg-yellow-100 hover:border-yellow-300' 
-                          : 'hover:bg-blue-50 hover:border-blue-200'
+                      className={`border-b border-gray-200 transition-all duration-200 ${backgroundClass} ${isSkipped ? 'line-through text-gray-400' : ''} ${
+                        hasUnallocated
+                          ? 'hover:bg-yellow-100'
+                          : 'hover:bg-gray-100'
                       }`}
                     >
                       {row.getVisibleCells().map((cell, index, array) => (
                         <td
                           key={cell.id}
-                          className={`p-2 ${
-                            index < array.length - 1 ? 'border-r border-slate-200' : ''
+                          className={`px-3 py-2 text-sm ${
+                            index < array.length - 1 ? 'border-r border-gray-200' : ''
                           }`}
                           style={{ width: `${cell.column.getSize()}px` }}
                         >
