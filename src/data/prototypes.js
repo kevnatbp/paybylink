@@ -74,5 +74,20 @@ export const prototypes = [
       progress: 25,
       route: '/prototypes/user-onboarding'
     },
+    {
+      id: 'api-docs',
+      title: 'Payment Links API Documentation',
+      description: 'Interactive API documentation for the Pay By Link Public API with Swagger UI',
+      category: 'Developer Tools',
+      status: 'completed',
+      priority: 'high',
+      lastUpdated: '2025-12-30',
+      author: 'Engineering Team',
+      comments: 0,
+      tags: ['api', 'documentation', 'openapi', 'swagger', 'payments'],
+      thumbnail: '📋',
+      progress: 100,
+      route: '/prototypes/api-docs'
+    },
     // ... more prototypes
   ];

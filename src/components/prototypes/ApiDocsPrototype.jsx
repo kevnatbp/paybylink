@@ -1,0 +1,82 @@
+import React, { useState, useEffect } from 'react';
+import SwaggerUI from 'swagger-ui-react';
+import 'swagger-ui-react/swagger-ui.css';
+
+const ApiDocsPrototype = () => {
+  const [spec, setSpec] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const loadSpec = async () => {
+      try {
+        const response = await fetch('/openapi-public-api.yaml');
+        if (!response.ok) {
+          throw new Error('Failed to load OpenAPI spec');
+        }
+        const yamlText = await response.text();
+        setSpec(yamlText);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSpec();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="h-full bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading API Documentation...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="h-full bg-white flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Error Loading API Documentation</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full bg-white">
+      <div className="container mx-auto px-4 py-6">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Pay By Link Public API</h1>
+          <p className="text-lg text-gray-600">
+            RESTful API for managing payment links with full CRUD operations
+          </p>
+        </div>
+
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <SwaggerUI
+            spec={spec}
+            docExpansion="list"
+            defaultModelExpandDepth={2}
+            defaultModelsExpandDepth={1}
+            displayRequestDuration={true}
+            tryItOutEnabled={true}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ApiDocsPrototype;
